@@ -1,0 +1,4 @@
+name: ImageGen
+description: Generates images using Hugging Face Stable Diffusion API.
+model: huggingface-flux
+entrypoint: imagegen_agent.py

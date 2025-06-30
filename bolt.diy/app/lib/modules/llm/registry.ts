@@ -1,5 +1,6 @@
 import AnthropicProvider from './providers/anthropic';
 import CohereProvider from './providers/cohere';
+import MCPProvider from './providers/MCPagent';
 import DeepseekProvider from './providers/deepseek';
 import GoogleProvider from './providers/google';
 import GroqProvider from './providers/groq';
@@ -20,6 +21,7 @@ import GithubProvider from './providers/github';
 export {
   AnthropicProvider,
   CohereProvider,
+  MCPProvider,
   DeepseekProvider,
   GoogleProvider,
   GroqProvider,

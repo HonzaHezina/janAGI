@@ -1,0 +1,4 @@
+name: CodeWriter
+description: Writes code based on task input.
+model: gpt-4
+entrypoint: code_writer.py
