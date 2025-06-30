@@ -1,0 +1,24 @@
+execution_engine: asyncio
+logger:
+  transports: [file]
+  level: debug
+  path: "logs/mcp-agent.jsonl"
+
+mcp:
+  servers:
+    fetch:
+      command: "/Users/saqadri/.local/bin/uvx"
+      args: ["mcp-server-fetch"]
+      description: "Fetch content at URLs from the world wide web"
+    filesystem:
+      command: "/Users/saqadri/.nvm/versions/node/v20.3.0/bin/npx"
+      args: [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          # Current directory will be added by the code
+        ]
+      description: "Read and write files on the filesystem"
+
+openai:
+  default_model: gpt-4o
+  # Secrets are loaded from mcp_agent.secrets.yaml
