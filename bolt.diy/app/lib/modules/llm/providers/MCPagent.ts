@@ -3,7 +3,6 @@ import type { ModelInfo } from '~/lib/modules/llm/types';
 import type { IProviderSetting } from '~/types/model';
 import type { LanguageModelV1 } from 'ai';
 import { logger } from '~/utils/logger';
-+
 // Note: MCP Agent provider integrates with the local mcp-agent FastAPI.
 // It exposes additional helper methods for agent CRUD and plan streaming.
 
@@ -141,6 +140,87 @@ export default class MCPAgentProvider extends BaseProvider {
   // Browsers cannot send a POST with EventSource, so we use fetch + ReadableStream parsing
   // of SSE "data: ..." frames. The onEvent callback receives parsed JSON objects when possible.
   //
+  // Helper: requestPlan -> asks the orchestration LLM to produce a structured plan (JSON preferred).
+  // Helper: approveAndExecute -> convert structured plan to textual plan lines and stream execution.
+  //
+  async requestPlan(userPrompt: string): Promise<{ assistant?: string; plan?: any; error?: string }> {
+    const baseUrl = this.config.baseUrl;
+    try {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'mcp-orchestrator',
+          messages: [{ role: 'user', content: userPrompt }],
+          temperature: 0.3
+        })
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        logger.error(`requestPlan failed: ${res.status} - ${txt}`);
+        return { error: `HTTP ${res.status}: ${txt}` };
+      }
+      const json: any = await res.json();
+      const assistant = json.choices?.[0]?.message?.content ?? '';
+      // Backend may attach plan_json top-level (fastapi returned response_content with plan_json)
+      const planCandidate = (json as any).plan_json ?? this.extractFirstJson(assistant);
+      return { assistant, plan: planCandidate ?? undefined };
+    } catch (err: any) {
+      logger.error(`requestPlan error: ${err}`);
+      return { error: String(err) };
+    }
+  }
+
+  extractFirstJson(text: string) {
+    if (!text || typeof text !== 'string') return null;
+    const start = text.indexOf('{');
+    if (start === -1) return null;
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          try {
+            return JSON.parse(text.slice(start, i + 1));
+          } catch (e) {
+            return null;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  planToText(planObj: any): string {
+    // Convert structured plan ({"plan":[...]}) into textual lines consumed by the executor.
+    if (!planObj) return '';
+    const steps = Array.isArray(planObj.plan) ? planObj.plan : (Array.isArray(planObj) ? planObj : []);
+    const lines: string[] = [];
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i] || {};
+      const num = step.step ?? step.index ?? (i + 1);
+      const desc = (step.description ?? '').toString();
+      const agent = (step.agent ?? '').toString();
+      const args = step.arguments ?? {};
+      let argsText = '';
+      try {
+        argsText = JSON.stringify(args);
+      } catch {
+        argsText = String(args);
+      }
+      lines.push(`${num}. ${desc} - agent: ${agent}, arguments: ${argsText}`);
+    }
+    return lines.join('\n');
+  }
+
+  approveAndExecute(planObj: any, onEvent: (event: any) => void): { cancel: () => void } {
+    // Convert structured plan into textual plan and call streamPlan to execute with SSE-like events.
+    const planText = this.planToText(planObj);
+    return this.streamPlan(planText, 'mcp-orchestrator', onEvent);
+  }
+
   streamPlan(
     planText: string,
     model: string = 'mcp-orchestrator',

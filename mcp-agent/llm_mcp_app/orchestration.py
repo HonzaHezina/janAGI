@@ -59,6 +59,48 @@ def _extract_first_json(text: str):
     return None
 
 
+def validate_plan_json(plan_obj: Any) -> (bool, str):
+    """
+    Basic validation for plan JSON structure.
+    Expects a dict with top-level "plan": [ { "step": int?, "description": str, "agent": str, "arguments": dict }, ... ]
+    Returns (True, "") if valid, otherwise (False, "reason").
+    """
+    if not isinstance(plan_obj, dict):
+        return False, "Plan must be a JSON object"
+    plan = plan_obj.get("plan")
+    if not isinstance(plan, list):
+        return False, "Top-level 'plan' must be an array"
+    for idx, step in enumerate(plan, start=1):
+        if not isinstance(step, dict):
+            return False, f"Step {idx} is not an object"
+        if "agent" not in step or not isinstance(step.get("agent"), str) or not step.get("agent"):
+            return False, f"Step {idx} missing 'agent' name"
+        if "description" in step and not isinstance(step.get("description"), str):
+            return False, f"Step {idx} 'description' must be a string"
+        if "arguments" in step and not isinstance(step.get("arguments"), dict):
+            return False, f"Step {idx} 'arguments' must be an object/dict"
+    return True, ""
+
+
+def plan_obj_to_text(plan_obj: Any) -> str:
+    """
+    Convert structured plan JSON into the legacy textual plan lines used by execute_plan_stream.
+    """
+    plan_steps = plan_obj.get("plan", []) if isinstance(plan_obj, dict) else []
+    plan_text_lines = []
+    for idx, step in enumerate(plan_steps, start=1):
+        step_num = step.get("step") or step.get("index") or idx
+        desc = step.get("description", "")
+        agent_name = step.get("agent", "")
+        args = step.get("arguments", {}) or {}
+        try:
+            args_text = json.dumps(args, ensure_ascii=False)
+        except Exception:
+            args_text = str(args)
+        plan_text_lines.append(f"{step_num}. {desc} - agent: {agent_name}, arguments: {args_text}")
+    return "\n".join(plan_text_lines)
+
+
 async def orchestrate_response(request: ChatCompletionRequest, agents: Dict[str, Agent]) -> JSONResponse:
     """
     Main orchestration logic:
@@ -367,6 +409,10 @@ async def execute_plan_stream(plan_text: str, model: str, agents: Dict[str, Agen
 async def handle_agent_call(request: ChatCompletionRequest, agents: Dict[str, Agent]) -> Optional[JSONResponse]:
     """
     Handle direct agent calls (legacy support).
+
+    Supports async agent functions and coroutine results returned by sync functions.
+    Expects last user message to be a JSON with structure:
+    {"tool_call": {"name": "<agent_name>", "arguments": {...}}}
     """
     if not request.messages or request.messages[-1].role != "user":
         return None
@@ -387,12 +433,25 @@ async def handle_agent_call(request: ChatCompletionRequest, agents: Dict[str, Ag
             return None
 
         logger.info(f"Executing agent: {agent_name} with arguments: {arguments}")
-        
+
         if not agent.functions:
             raise HTTPException(status_code=500, detail=f"Agent '{agent_name}' has no functions.")
 
         agent_function = agent.functions[0]
-        result = agent_function(**arguments)
+
+        # Execute agent function with support for async functions and coroutine results
+        try:
+            if inspect.iscoroutinefunction(agent_function):
+                result = await agent_function(**arguments)
+            else:
+                possible = agent_function(**arguments)
+                if asyncio.iscoroutine(possible):
+                    result = await possible
+                else:
+                    result = possible
+        except Exception as exec_err:
+            logger.error(f"Error executing agent '{agent_name}': {exec_err}")
+            raise HTTPException(status_code=500, detail=f"Error during agent execution: {str(exec_err)}")
 
         response_content = {
             "id": f"chatcmpl-agent-{os.urandom(8).hex()}",
@@ -411,6 +470,8 @@ async def handle_agent_call(request: ChatCompletionRequest, agents: Dict[str, Ag
 
     except json.JSONDecodeError:
         return None
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error executing agent call: {e}")
         raise HTTPException(status_code=500, detail=f"Error during agent execution: {str(e)}")
