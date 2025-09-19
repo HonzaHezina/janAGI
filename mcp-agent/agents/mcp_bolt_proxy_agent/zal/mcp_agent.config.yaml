@@ -1,7 +1,0 @@
-
-agent_name: mcp_bolt_proxy_agent
-description: A proxy agent for integrating LLMs with the Bolt.diy application.
-version: 0.1.0
-# Add any specific configuration for the agent here
-# For example, the URL of the Bolt.diy application
-bolt_api_url: http://localhost:3000/api/bolt # Default Bolt.diy API endpoint

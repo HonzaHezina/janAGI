@@ -1,4 +1,0 @@
-name: Planner
-description: Central planner that creates task plans from user intent.
-model: gpt-4
-entrypoint: planner_agent.py

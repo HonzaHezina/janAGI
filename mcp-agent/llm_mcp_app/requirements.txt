@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-dotenv
+google-generativeai
+opentelemetry-api
+opentelemetry-sdk
+mcp
+aiohttp
+websockets
