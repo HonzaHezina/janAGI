@@ -7,7 +7,9 @@ import json
 import os
 import time
 import ast
-from typing import Optional, Dict
+import asyncio
+import inspect
+from typing import Optional, Dict, Any, AsyncGenerator
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
@@ -28,6 +30,35 @@ except ImportError:
     from config import logger, LLM_PROVIDER, DEFAULT_MODELS
 
 
+def _extract_first_json(text: str):
+    """Extract the first JSON object found in the provided text."""
+    if not text or not isinstance(text, str):
+        return None
+    start = text.find('{')
+    while start != -1:
+        brace = 0
+        end = -1
+        for i in range(start, len(text)):
+            if text[i] == '{':
+                brace += 1
+            elif text[i] == '}':
+                brace -= 1
+                if brace == 0:
+                    end = i
+                    break
+        if end != -1:
+            candidate = text[start:end+1]
+            try:
+                return json.loads(candidate)
+            except Exception:
+                # try next possible '{'
+                start = text.find('{', start+1)
+                continue
+        else:
+            break
+    return None
+
+
 async def orchestrate_response(request: ChatCompletionRequest, agents: Dict[str, Agent]) -> JSONResponse:
     """
     Main orchestration logic:
@@ -39,30 +70,40 @@ async def orchestrate_response(request: ChatCompletionRequest, agents: Dict[str,
     user_message = request.messages[-1].content if request.messages else ""
     
     # Create system prompt for decision making
+    # NOTE: We now prefer a machine-readable JSON response. If the assistant can
+    # answer directly, return a JSON object: {"direct_answer": "..."}.
+    # If it needs agents, return a JSON object with a "plan" field:
+    # {
+    #   "plan": [
+    #     {"step": 1, "description": "...", "agent": "codewriter", "arguments": {"task": "..."}},
+    #     ...
+    #   ]
+    # }
+    # The assistant MAY also include a short human-friendly summary before/after the JSON,
+    # but the JSON object must be parseable by extracting the first JSON object in the text.
     decision_prompt = f"""
-You are a helpful AI assistant with access to these agents:
-{', '.join(agents.keys())}
+You are a helpful AI assistant with access to these agents: {', '.join(agents.keys())}
 
 User asks: "{user_message}"
 
 Decide:
-1. If you can answer directly without agents, respond normally.
-2. If you need agents, create a plan in format:
+1) If you can answer directly without using agents, respond with valid JSON:
+   {"{"}"direct_answer": "<your answer here>"{"}"}.
+2) If you need to use agents, respond with valid JSON containing a top-level "plan" array:
+   {"{"}"plan": [{"step": 1, "description": "...", "agent": "<agent_name>", "arguments": {...}}, ...]{"}"}.
+   
+Available agents and example arguments:
+- finder: {"{"}"query": "search terms"{"}"}
+- codewriter: {"{"}"task": "generate html template for ..."{"}"}
+- image_generator: {"{"}"prompt": "describe image"{"}"}
+- html_parser: {"{"}"url": "https://..."{"}"}
 
-PLAN:
-1. [step description] - agent: [agent_name], arguments: [arguments]
-2. [step description] - agent: [agent_name], arguments: [arguments]
-...
+Rules:
+- Return strictly valid JSON for either the direct_answer or plan case (you may include a short human message, but ensure a valid JSON object appears in the assistant reply).
+- Use clear agent names from the available agents list.
+- Keep plan steps small and ordered.
 
-Available agents:
-- finder: file search (arguments: query)
-- codewriter: code generation (arguments: task)
-- image_generator: image generation (arguments: prompt)
-- html_parser: web scraping (arguments: url)
-
-Answer either:
-- Directly to the question (without word PLAN)
-- Or create PLAN: with steps
+Only output JSON or JSON plus a short human summary. Do not output ambiguous plain-text plans.
 """
 
     # Ask LLM for decision
@@ -77,17 +118,26 @@ Answer either:
         provider = get_provider(current_model)
         llm_response = await provider.generate(decision_request)
         decision_content = provider._extract_content(llm_response)
-        
-        # Check if LLM created a plan
-        if "PLAN:" in decision_content:
-            # LLM created plan - return for approval
-            plan_response = f"""
-{decision_content}
 
-🤔 **Do you want to approve and execute this plan?**
-Answer 'yes' to execute or 'no' to cancel.
+        # Try to extract JSON from LLM output (preferred: {"plan": [...]} or {"direct_answer": "..."})
+        json_obj = _extract_first_json(decision_content)
+        if json_obj and isinstance(json_obj, dict) and "plan" in json_obj:
+            plan_obj = json_obj["plan"]
+            # Build a human-friendly preview including the JSON plan for confirmation
+            try:
+                pretty_json = json.dumps(json_obj, ensure_ascii=False, indent=2)
+            except Exception:
+                pretty_json = str(json_obj)
+
+            plan_response = f"""
+Plán byl vytvořen. Níže naleznete strukturovaný plán (JSON):
+
+{pretty_json}
+
+🤔 **Chcete schválit a spustit tento plán?**
+Odpovězte 'yes' nebo 'ano' pro spuštění, 'no' nebo 'ne' pro zrušení.
 """
-            
+
             response_content = {
                 "id": f"chatcmpl-plan-{os.urandom(8).hex()}",
                 "object": "chat.completion",
@@ -99,26 +149,44 @@ Answer 'yes' to execute or 'no' to cancel.
                     "logprobs": None,
                     "finish_reason": "stop"
                 }],
-                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                "plan_json": plan_obj
             }
             return JSONResponse(content=response_content)
-        
-        else:
-            # LLM answered directly - return response with correct model name
+
+        # If direct_answer JSON present
+        if json_obj and isinstance(json_obj, dict) and "direct_answer" in json_obj:
+            answer = json_obj.get("direct_answer", "")
             response_content = {
                 "id": f"chatcmpl-direct-{os.urandom(8).hex()}",
                 "object": "chat.completion",
                 "created": int(time.time()),
-                "model": request.model,  # Keep original model name (mcp-orchestrator)
+                "model": request.model,
                 "choices": [{
                     "index": 0,
-                    "message": {"role": "assistant", "content": decision_content},
+                    "message": {"role": "assistant", "content": answer},
                     "logprobs": None,
                     "finish_reason": "stop"
                 }],
                 "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
             }
             return JSONResponse(content=response_content)
+
+        # Fallback: no valid JSON plan, treat content as direct answer
+        response_content = {
+            "id": f"chatcmpl-direct-{os.urandom(8).hex()}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": request.model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": decision_content},
+                "logprobs": None,
+                "finish_reason": "stop"
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        }
+        return JSONResponse(content=response_content)
             
     except Exception as e:
         logger.error(f"Error in orchestration: {e}")
@@ -135,19 +203,32 @@ async def handle_plan_execution(request: ChatCompletionRequest, agents: Dict[str
     user_message = request.messages[-1].content.lower().strip()
     previous_message = request.messages[-2].content if len(request.messages) >= 2 else ""
     
-    # Check if previous message contained a plan
-    if "PLAN:" not in previous_message or "Do you want to approve" not in previous_message:
+    # Check if previous message contained a plan (JSON preferred)
+    json_obj = _extract_first_json(previous_message)
+    if not (json_obj and isinstance(json_obj, dict) and "plan" in json_obj):
         return None
-    
+
     if user_message in ['yes', 'ano', 'execute', 'approve', 'ok']:
+        # Convert structured plan into textual lines for executor if needed
+        plan_steps = json_obj.get("plan", [])
+        plan_text_lines = []
+        for step in plan_steps:
+            step_num = step.get("step") or step.get("index") or (len(plan_text_lines) + 1)
+            desc = step.get("description", "")
+            agent_name = step.get("agent", "")
+            args = step.get("arguments", {})
+            args_text = json.dumps(args, ensure_ascii=False)
+            plan_text_lines.append(f"{step_num}. {desc} - agent: {agent_name}, arguments: {args_text}")
+        plan_text = "\n".join(plan_text_lines)
+
         # User approved plan - execute it
-        return await execute_plan(previous_message, request.model, agents)
-    
+        return await execute_plan(plan_text, request.model, agents)
+
     elif user_message in ['no', 'ne', 'cancel', 'reject']:
         # User rejected plan
         response_content = {
             "id": f"chatcmpl-cancel-{os.urandom(8).hex()}",
-            "object": "chat.completion", 
+            "object": "chat.completion",
             "created": int(time.time()),
             "model": request.model,
             "choices": [{
@@ -165,51 +246,83 @@ async def handle_plan_execution(request: ChatCompletionRequest, agents: Dict[str
 
 async def execute_plan(plan_text: str, model: str, agents: Dict[str, Agent]) -> JSONResponse:
     """
-    Executes approved plan step by step.
+    Executes approved plan step by step (synchronous response).
+    Kept for backward compatibility — uses the same execution logic as the streaming variant.
     """
-    logger.info("Executing approved plan...")
-    
-    results = ["✅ **Executing approved plan:**\n"]
-    
-    # Parse plan
+    # Reuse streaming executor to collect results
+    collected = []
+    async for event in execute_plan_stream(plan_text, model, agents):
+        # collect human-readable messages when available
+        if isinstance(event, dict) and event.get("type") == "step_result":
+            collected.append(f"\n🔄 **Step {event.get('step')}:** {event.get('description')}")
+            collected.append(f"✅ Result: {event.get('result')}")
+        elif isinstance(event, dict) and event.get("type") == "step_error":
+            collected.append(f"\n🔄 **Step {event.get('step')}:** {event.get('description')}")
+            collected.append(f"❌ Error in step {event.get('step')}: {event.get('error')}")
+    collected.insert(0, "✅ **Executing approved plan:**\n")
+    collected.append("\n🎉 **Plan completed!**")
+
+    response_content = {
+        "id": f"chatcmpl-executed-{os.urandom(8).hex()}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": "\n".join(collected)},
+            "logprobs": None,
+            "finish_reason": "stop"
+        }],
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    }
+    return JSONResponse(content=response_content)
+
+
+async def execute_plan_stream(plan_text: str, model: str, agents: Dict[str, Agent]) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    Stream execution of an approved plan.
+    Yields events dictionaries for SSE streaming. Events can have types:
+      - step_start: {type: "step_start", step, description}
+      - step_result: {type: "step_result", step, description, result}
+      - step_error: {type: "step_error", step, description, error}
+      - finished: {type: "finished"}
+    """
+    logger.info("Streaming execution of approved plan...")
+    # Parse plan lines (retain original simple parser for now)
     plan_lines = [line.strip() for line in plan_text.split('\n') if line.strip() and line.strip()[0].isdigit()]
-    
+
     for i, line in enumerate(plan_lines, 1):
+        description = ""
         try:
-            # Parse plan line
-            # Format: "1. description - agent: name, arguments: {args}"
             if " - agent: " not in line:
                 continue
-                
             description = line.split(" - agent: ")[0]
             agent_part = line.split(" - agent: ")[1]
-            
             if ", arguments: " not in agent_part:
                 continue
-                
             agent_name = agent_part.split(", arguments: ")[0]
             args_text = agent_part.split(", arguments: ")[1]
-            
-            results.append(f"\n🔄 **Step {i}:** {description}")
-            
+
+            # Notify start
+            yield {"type": "step_start", "step": i, "description": description, "agent": agent_name}
+
             # Find agent
             agent = agents.get(agent_name)
             if not agent:
-                results.append(f"❌ Agent '{agent_name}' not found")
+                err = f"Agent '{agent_name}' not found"
+                yield {"type": "step_error", "step": i, "description": description, "error": err}
                 continue
-            
-            # Execute agent
+
             if not agent.functions:
-                results.append(f"❌ Agent '{agent_name}' has no functions")
+                err = f"Agent '{agent_name}' has no functions"
+                yield {"type": "step_error", "step": i, "description": description, "error": err}
                 continue
-            
-            # Parse arguments according to agent
+
+            # Parse arguments
             try:
-                # If arguments are in JSON format
                 if args_text.startswith('{'):
                     arguments = ast.literal_eval(args_text)
                 else:
-                    # Otherwise use correct argument based on agent
                     args_clean = args_text.strip('"{}')
                     if agent_name == "image_generator":
                         arguments = {"prompt": args_clean}
@@ -224,32 +337,31 @@ async def execute_plan(plan_text: str, model: str, agents: Dict[str, Agent]) -> 
             except Exception as parse_error:
                 logger.error(f"Error parsing arguments '{args_text}': {parse_error}")
                 arguments = {"prompt": args_text.strip('"{}')}
-            
+
+            # Call agent function, support async and sync functions
             agent_function = agent.functions[0]
-            result = agent_function(**arguments)
-            
-            results.append(f"✅ Result: {result}")
-            
+            try:
+                if inspect.iscoroutinefunction(agent_function):
+                    result = await agent_function(**arguments)
+                else:
+                    # If function returns coroutine-like object, await it
+                    possible = agent_function(**arguments)
+                    if asyncio.iscoroutine(possible):
+                        result = await possible
+                    else:
+                        result = possible
+                yield {"type": "step_result", "step": i, "description": description, "result": result}
+            except Exception as exec_err:
+                logger.error(f"Error executing agent '{agent_name}' step {i}: {exec_err}")
+                yield {"type": "step_error", "step": i, "description": description, "error": str(exec_err)}
         except Exception as e:
-            logger.error(f"Error executing plan step {i}: {e}")
-            results.append(f"❌ Error in step {i}: {str(e)}")
-    
-    results.append("\n🎉 **Plan completed!**")
-    
-    response_content = {
-        "id": f"chatcmpl-executed-{os.urandom(8).hex()}",
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [{
-            "index": 0,
-            "message": {"role": "assistant", "content": "\n".join(results)},
-            "logprobs": None,
-            "finish_reason": "stop"
-        }],
-        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-    }
-    return JSONResponse(content=response_content)
+            logger.error(f"Unexpected error in plan streaming step {i}: {e}")
+            yield {"type": "step_error", "step": i, "description": description or f"line:{line}", "error": str(e)}
+        # yield control briefly
+        await asyncio.sleep(0)
+
+    # Finished
+    yield {"type": "finished"}
 
 
 async def handle_agent_call(request: ChatCompletionRequest, agents: Dict[str, Agent]) -> Optional[JSONResponse]:

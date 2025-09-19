@@ -3,6 +3,9 @@ import type { ModelInfo } from '~/lib/modules/llm/types';
 import type { IProviderSetting } from '~/types/model';
 import type { LanguageModelV1 } from 'ai';
 import { logger } from '~/utils/logger';
++
+// Note: MCP Agent provider integrates with the local mcp-agent FastAPI.
+// It exposes additional helper methods for agent CRUD and plan streaming.
 
 export default class MCPAgentProvider extends BaseProvider {
   name = 'MCPAgent';
@@ -93,5 +96,142 @@ export default class MCPAgentProvider extends BaseProvider {
     // MCP Agent emuluje OpenAI API, takže můžeme použít getOpenAILikeModel
     // API klíč není potřeba, protože MCP Agent má vlastní autentizaci vůči Gemini
     return getOpenAILikeModel(baseUrl, '', model);
+  }
+
+  // --- Agent code CRUD operations ------------------------------------------------
+  async getAgentCode(name: string): Promise<{ name?: string; code?: string; detail?: string }> {
+    const baseUrl = this.config.baseUrl;
+    try {
+      const res = await fetch(`${baseUrl}/agents/${encodeURIComponent(name)}/code`);
+      if (!res.ok) {
+        const txt = await res.text();
+        logger.error(`getAgentCode failed: ${res.status} - ${txt}`);
+        return { detail: `HTTP ${res.status}: ${txt}` };
+      }
+      return await res.json();
+    } catch (err) {
+      logger.error(`getAgentCode error: ${err}`);
+      return { detail: String(err) };
+    }
+  }
+
+  async putAgentCode(name: string, code: string): Promise<{ detail?: string; agents?: string[] }> {
+    const baseUrl = this.config.baseUrl;
+    try {
+      const res = await fetch(`${baseUrl}/agents/${encodeURIComponent(name)}/code`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        logger.error(`putAgentCode failed: ${res.status} - ${txt}`);
+        return { detail: `HTTP ${res.status}: ${txt}` };
+      }
+      return await res.json();
+    } catch (err) {
+      logger.error(`putAgentCode error: ${err}`);
+      return { detail: String(err) };
+    }
+  }
+
+  // --- Plan execution streaming (SSE-like) ---------------------------------------
+  //
+  // The backend exposes POST /v1/plan/stream which returns Server-Sent Events text stream.
+  // Browsers cannot send a POST with EventSource, so we use fetch + ReadableStream parsing
+  // of SSE "data: ..." frames. The onEvent callback receives parsed JSON objects when possible.
+  //
+  streamPlan(
+    planText: string,
+    model: string = 'mcp-orchestrator',
+    onEvent: (event: any) => void,
+  ): { cancel: () => void } {
+    const baseUrl = this.config.baseUrl;
+    const controller = new AbortController();
+    const url = `${baseUrl}/plan/stream`;
+
+    (async () => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: planText, model }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          logger.error(`plan_stream failed: ${res.status} - ${txt}`);
+          onEvent({ type: 'error', error: `HTTP ${res.status}: ${txt}` });
+          return;
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) {
+          onEvent({ type: 'error', error: 'No stream reader available' });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE frames are separated by double newlines; process complete frames
+          let idx;
+          while ((idx = buffer.indexOf('\n\n')) !== -1) {
+            const raw = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 2);
+            // Each raw may contain multiple "data: " lines; collect them
+            const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                const payload = line.slice(5).trim();
+                try {
+                  const parsed = JSON.parse(payload);
+                  onEvent(parsed);
+                } catch (e) {
+                  // not JSON — send raw
+                  onEvent({ raw: payload });
+                }
+              } else {
+                // ignore other SSE meta lines
+              }
+            }
+          }
+        }
+
+        // flush remaining buffer if any
+        if (buffer.trim()) {
+          const lines = buffer.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const payload = line.slice(5).trim();
+              try {
+                const parsed = JSON.parse(payload);
+                onEvent(parsed);
+              } catch {
+                onEvent({ raw: payload });
+              }
+            }
+          }
+        }
+
+        onEvent({ type: 'finished' });
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          onEvent({ type: 'cancelled' });
+        } else {
+          logger.error(`streamPlan error: ${err}`);
+          onEvent({ type: 'error', error: String(err) });
+        }
+      }
+    })();
+
+    return {
+      cancel: () => controller.abort(),
+    };
   }
 }
