@@ -335,48 +335,104 @@ class OpenAIProvider(LLMProvider):
 
 
 def get_provider(model_name: str) -> LLMProvider:
-    """Factory function to get the appropriate LLM provider."""
+    """Factory function to get the appropriate LLM provider.
+
+    This function attempts to create a real provider (Gemini/HuggingFace/OpenAI)
+    but falls back to a DummyProvider if required credentials are missing or
+    provider initialization fails. This prevents server crashes when API keys
+    are not configured.
+    """
+    # Local helper: safe instantiation with fallback
+    def _safe_instantiate(provider_cls, *args, **kwargs):
+        try:
+            return provider_cls(*args, **kwargs)
+        except Exception as e:
+            logger.warning(f"Failed to instantiate {provider_cls.__name__}: {e}. Using DummyProvider fallback.")
+            return DummyProvider(args[0] if args else "unknown")
+
     # Special handling for mcp-orchestrator - use configured provider
     if model_name == "mcp-orchestrator":
         try:
             from .config import LLM_PROVIDER, DEFAULT_MODELS
         except ImportError:
             from config import LLM_PROVIDER, DEFAULT_MODELS
-        
-        print(f"DEBUG: LLM_PROVIDER = {LLM_PROVIDER}")
-        print(f"DEBUG: DEFAULT_MODELS = {DEFAULT_MODELS}")
-            
+
         default_model = DEFAULT_MODELS.get(LLM_PROVIDER, "gemini-1.5-flash")
-        print(f"DEBUG: Using default_model = {default_model}")
-        
+        logger.info(f"Using orchestrator default model = {default_model} for provider {LLM_PROVIDER}")
+
         if LLM_PROVIDER == "huggingface":
-            print("DEBUG: Creating HuggingFaceProvider")
-            return HuggingFaceProvider(default_model)
+            return _safe_instantiate(HuggingFaceProvider, default_model)
         elif LLM_PROVIDER == "openai":
-            print("DEBUG: Creating OpenAIProvider")
-            return OpenAIProvider(default_model)
+            return _safe_instantiate(OpenAIProvider, default_model)
         else:
-            print("DEBUG: Creating GeminiProvider")
-            return GeminiProvider(default_model)
-    
+            return _safe_instantiate(GeminiProvider, default_model)
+
     # Regular model detection
-    if "gemini" in model_name.lower():
-        return GeminiProvider(model_name)
-    elif "gpt" in model_name.lower() or "openai" in model_name.lower():
-        return OpenAIProvider(model_name)
-    elif "huggingface" in model_name.lower() or "/" in model_name:  # HF modely často mají formát "author/model"
-        return HuggingFaceProvider(model_name)
+    try:
+        lname = model_name.lower()
+    except Exception:
+        lname = ""
+
+    if "gemini" in lname:
+        return _safe_instantiate(GeminiProvider, model_name)
+    elif "gpt" in lname or "openai" in lname:
+        return _safe_instantiate(OpenAIProvider, model_name)
+    elif "huggingface" in lname or "/" in model_name:  # HF modely často mají formát "author/model"
+        return _safe_instantiate(HuggingFaceProvider, model_name)
     else:
         # Výchozí provider na základě konfigurace
         try:
             from .config import LLM_PROVIDER, DEFAULT_MODELS
         except ImportError:
             from config import LLM_PROVIDER, DEFAULT_MODELS
-            
+
         default_model = DEFAULT_MODELS.get(LLM_PROVIDER, "gemini-1.5-flash")
         if LLM_PROVIDER == "huggingface":
-            return HuggingFaceProvider(default_model)
+            return _safe_instantiate(HuggingFaceProvider, default_model)
         elif LLM_PROVIDER == "openai":
-            return OpenAIProvider(default_model)
+            return _safe_instantiate(OpenAIProvider, default_model)
         else:
-            return GeminiProvider(default_model)
+            return _safe_instantiate(GeminiProvider, default_model)
+
+
+# --- DummyProvider for safe fallback when API keys are missing or provider init fails ---
+class DummyProvider(LLMProvider):
+    def __init__(self, model_name: str):
+        super().__init__(model_name)
+
+    async def generate(self, request: ChatCompletionRequest) -> Dict[str, Any]:
+        prompt_summary = ""
+        try:
+            prompt_summary = " | ".join(m.content for m in request.messages[-3:])
+        except Exception:
+            prompt_summary = request.messages[-1].content if request.messages else ""
+        text = (
+            f"[DUMMY PROVIDER] Running in offline/fallback mode for model '{self.model_name}'. "
+            f"Prompt summary: {prompt_summary}"
+        )
+        return {"generated_text": text, "dummy": True}
+
+    async def stream_generate(self, request: ChatCompletionRequest) -> AsyncGenerator[str, None]:
+        # Simulate streaming by yielding the generated text in chunks
+        response = await self.generate(request)
+        content = self._extract_content(response)
+        for i in range(0, len(content), 120):
+            chunk = {"id": f"chatcmpl-dummy-{os.urandom(6).hex()}", "object": "chat.completion.chunk",
+                     "created": int(time.time()), "model": self.model_name,
+                     "choices": [{"index": 0, "delta": {"content": content[i:i+120]}, "finish_reason": None}]}
+            yield f"data: {json.dumps(chunk)}\n\n"
+        final_chunk = {"id": f"chatcmpl-dummy-{os.urandom(6).hex()}", "object": "chat.completion.chunk",
+                       "created": int(time.time()), "model": self.model_name,
+                       "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+        yield f"data: {json.dumps(final_chunk)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    def _extract_content(self, response: Dict[str, Any]) -> str:
+        try:
+            # Support both HF-like and generic responses
+            if isinstance(response, dict):
+                return response.get("generated_text") or response.get("text") or str(response)
+            return str(response)
+        except Exception as e:
+            logger.error(f"DummyProvider _extract_content error: {e}")
+            return ""

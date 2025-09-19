@@ -37,10 +37,14 @@ def load_all_agents(agents_dir: str = AGENTS_DIR) -> Dict[str, Agent]:
         main_py_path = agent_path / "main.py"
         if agent_path.is_dir() and main_py_path.is_file():
             try:
-                spec = importlib.util.spec_from_file_location(
-                    f"agents.{agent_name}.main", main_py_path
-                )
+                # Use a unique module name per load to allow hot-reload without module cache issues
+                unique_mod_name = f"agents.{agent_name}.main_{os.urandom(4).hex()}"
+                spec = importlib.util.spec_from_file_location(unique_mod_name, main_py_path)
                 agent_module = importlib.util.module_from_spec(spec)
+                # Ensure loader exists before exec
+                if spec.loader is None:
+                    logger.error(f"No loader for module spec of agent {agent_name}")
+                    continue
                 spec.loader.exec_module(agent_module)
 
                 if hasattr(agent_module, "get_agent"):

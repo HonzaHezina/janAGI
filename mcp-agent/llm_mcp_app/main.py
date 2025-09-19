@@ -63,6 +63,94 @@ async def get_models():
         ]
     
     return JSONResponse(content={"data": agent_models + llm_models, "object": "list"})
+    
+# --- Agents management endpoints ---
+from fastapi import Request, Body
+from pathlib import Path
+
+@app.get("/v1/agents")
+async def list_agents():
+    """Return list of currently loaded agents."""
+    return JSONResponse(content={"agents": list(AGENTS.keys())})
+
+@app.get("/v1/agents/{agent_name}/code")
+async def get_agent_code(agent_name: str):
+    """Return the source code of the agent's main.py if available."""
+    agent_path = Path(AGENTS_DIR) / agent_name / "main.py"
+    if not agent_path.is_file():
+        return JSONResponse(status_code=404, content={"detail": "Agent or code not found"})
+    try:
+        return JSONResponse(content={"name": agent_name, "code": agent_path.read_text(encoding='utf-8')})
+    except Exception as e:
+        logger.error(f"Error reading agent code for {agent_name}: {e}")
+        return JSONResponse(status_code=500, content={"detail": "Failed to read agent code"})
+
+@app.put("/v1/agents/{agent_name}/code")
+async def put_agent_code(agent_name: str, payload: dict = Body(...)):
+    """Replace agent code and reload agents. Payload: { "code": "..." }"""
+    code = payload.get("code")
+    if code is None:
+        return JSONResponse(status_code=400, content={"detail": "Missing 'code' in body"})
+    agent_dir = Path(AGENTS_DIR) / agent_name
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    agent_main = agent_dir / "main.py"
+    try:
+        agent_main.write_text(code, encoding='utf-8')
+    except Exception as e:
+        logger.error(f"Failed to write code for agent {agent_name}: {e}")
+        return JSONResponse(status_code=500, content={"detail": "Failed to write agent code"})
+    # Reload agents
+    global AGENTS
+    AGENTS = load_all_agents()
+    logger.info(f"Reloaded agents after update: {list(AGENTS.keys())}")
+    return JSONResponse(content={"detail": "Agent code updated and agents reloaded", "agents": list(AGENTS.keys())})
+
+@app.post("/v1/agents/reload")
+async def reload_agents():
+    """Force reload of all agents from disk."""
+    global AGENTS
+    AGENTS = load_all_agents()
+    logger.info(f"Agents reloaded: {list(AGENTS.keys())}")
+    return JSONResponse(content={"detail": "Agents reloaded", "agents": list(AGENTS.keys())})
+
+# --- Plan execution streaming endpoint ---
+from fastapi.responses import StreamingResponse
+import asyncio
+
+@app.post("/v1/plan/stream")
+async def plan_stream(request: Request):
+    """
+    Stream execution of a plan. Expect JSON body with:
+    { "plan": "<plan_text>", "model": "mcp-orchestrator" }
+    Streams Server-Sent Events with 'data: <json>' frames.
+    """
+    body = await request.json()
+    plan_text = body.get("plan")
+    model = body.get("model", "mcp-orchestrator")
+    if not plan_text:
+        return JSONResponse(status_code=400, content={"detail": "Missing 'plan' in body"})
+
+    async def event_generator():
+        try:
+            # Delegate to orchestration streaming executor
+            try:
+                from .orchestration import execute_plan_stream
+            except ImportError:
+                from orchestration import execute_plan_stream
+
+            async for chunk in execute_plan_stream(plan_text, model, AGENTS):
+                # Each chunk is expected to be a dict or string; ensure it's JSON string
+                if isinstance(chunk, dict):
+                    data = json.dumps(chunk, ensure_ascii=False)
+                else:
+                    data = str(chunk)
+                yield f"data: {data}\n\n"
+                await asyncio.sleep(0)  # yield control
+        except Exception as e:
+            logger.error(f"Error in plan_stream generator: {e}")
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.post("/v1/chat/completions")
