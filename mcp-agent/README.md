@@ -43,6 +43,9 @@
 Altogether, this is the simplest and easiest way to build robust agent applications. Much like MCP, this project is in early development.
 We welcome all kinds of [contributions](/CONTRIBUTING.md), feedback and your help in growing this to become a new standard.
 
+---
+
+
 ## Get Started
 
 We recommend using [uv](https://docs.astral.sh/uv/) to manage your Python projects:

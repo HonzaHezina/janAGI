@@ -11,7 +11,7 @@ import asyncio
 import inspect
 from typing import Optional, Dict, Any, AsyncGenerator
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 try:
     from mcp_agent.agents.agent import Agent
@@ -123,30 +123,31 @@ async def orchestrate_response(request: ChatCompletionRequest, agents: Dict[str,
     # }
     # The assistant MAY also include a short human-friendly summary before/after the JSON,
     # but the JSON object must be parseable by extracting the first JSON object in the text.
-    decision_prompt = f"""
-You are a helpful AI assistant with access to these agents: {', '.join(agents.keys())}
-
-User asks: "{user_message}"
-
-Decide:
-1) If you can answer directly without using agents, respond with valid JSON:
-   {"{"}"direct_answer": "<your answer here>"{"}"}.
-2) If you need to use agents, respond with valid JSON containing a top-level "plan" array:
-   {"{"}"plan": [{"step": 1, "description": "...", "agent": "<agent_name>", "arguments": {...}}, ...]{"}"}.
-   
-Available agents and example arguments:
-- finder: {"{"}"query": "search terms"{"}"}
-- codewriter: {"{"}"task": "generate html template for ..."{"}"}
-- image_generator: {"{"}"prompt": "describe image"{"}"}
-- html_parser: {"{"}"url": "https://..."{"}"}
-
-Rules:
-- Return strictly valid JSON for either the direct_answer or plan case (you may include a short human message, but ensure a valid JSON object appears in the assistant reply).
-- Use clear agent names from the available agents list.
-- Keep plan steps small and ordered.
-
-Only output JSON or JSON plus a short human summary. Do not output ambiguous plain-text plans.
-"""
+    # python
+    decision_prompt = """
+    You are a helpful AI assistant with access to these agents: {agents_list}
+    
+    User asks: "{user_message}"
+    
+    Decide:
+    1) If you can answer directly without using agents, respond with valid JSON:
+       {"direct_answer": "<your answer here>"}.
+    2) If you need to use agents, respond with valid JSON containing a top-level "plan" array:
+       {"plan": [{"step": 1, "description": "...", "agent": "<agent_name>", "arguments": {...}}, ...]}.
+    
+    Available agents and example arguments:
+    - finder: {"query": "search terms"}
+    - codewriter: {"task": "generate html template for ..."}
+    - image_generator: {"prompt": "describe image"}
+    - html_parser: {"url": "https://..."}
+    
+    Rules:
+    - Return strictly valid JSON for either the direct_answer or plan case (you may include a short human message, but ensure a valid JSON object appears in the assistant reply).
+    - Use clear agent names from the available agents list.
+    - Keep plan steps small and ordered.
+    
+    Only output JSON or JSON plus a short human summary. Do not output ambiguous plain-text plans.
+    """.replace("{agents_list}", ", ".join(agents.keys())).replace("{user_message}", user_message)
 
     # Ask LLM for decision
     current_model = DEFAULT_MODELS.get(LLM_PROVIDER, "gemini-1.5-flash")
@@ -160,6 +161,42 @@ Only output JSON or JSON plus a short human summary. Do not output ambiguous pla
         provider = get_provider(current_model)
         llm_response = await provider.generate(decision_request)
         decision_content = provider._extract_content(llm_response)
+
+        # Debug trace
+        try:
+            logger.info(f"Orchestration: decision_content (truncated 200 chars): {str(decision_content)[:200]}")
+        except Exception:
+            logger.info("Orchestration: decision_content (unprintable)")
+        try:
+            logger.info(f"Orchestration: provider class = {provider.__class__.__name__}")
+        except Exception:
+            pass
+        try:
+            logger.info(f"Orchestration: request.stream = {getattr(request, 'stream', False)}")
+        except Exception:
+            logger.info("Orchestration: could not read request.stream")
+
+        # Helper: create an async SSE generator yielding OpenAI-like chunks
+        async def _single_sse(content_str: str):
+            # initial content chunk
+            chunk = {
+                "id": f"chatcmpl-{os.urandom(8).hex()}",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "delta": {"content": content_str}, "finish_reason": None}]
+            }
+            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            # final stop chunk
+            final = {
+                "id": f"chatcmpl-{os.urandom(8).hex()}",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
+            }
+            yield f"data: {json.dumps(final, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
 
         # Try to extract JSON from LLM output (preferred: {"plan": [...]} or {"direct_answer": "..."})
         json_obj = _extract_first_json(decision_content)
@@ -180,6 +217,10 @@ Plán byl vytvořen. Níže naleznete strukturovaný plán (JSON):
 Odpovězte 'yes' nebo 'ano' pro spuštění, 'no' nebo 'ne' pro zrušení.
 """
 
+            # If client requested streaming, return SSE with OpenAI-like chunks
+            if getattr(request, "stream", False):
+                return StreamingResponse(_single_sse(plan_response), media_type="text/event-stream")
+
             response_content = {
                 "id": f"chatcmpl-plan-{os.urandom(8).hex()}",
                 "object": "chat.completion",
@@ -199,6 +240,11 @@ Odpovězte 'yes' nebo 'ano' pro spuštění, 'no' nebo 'ne' pro zrušení.
         # If direct_answer JSON present
         if json_obj and isinstance(json_obj, dict) and "direct_answer" in json_obj:
             answer = json_obj.get("direct_answer", "")
+
+            # Stream if requested
+            if getattr(request, "stream", False):
+                return StreamingResponse(_single_sse(answer), media_type="text/event-stream")
+
             response_content = {
                 "id": f"chatcmpl-direct-{os.urandom(8).hex()}",
                 "object": "chat.completion",
@@ -215,6 +261,10 @@ Odpovězte 'yes' nebo 'ano' pro spuštění, 'no' nebo 'ne' pro zrušení.
             return JSONResponse(content=response_content)
 
         # Fallback: no valid JSON plan, treat content as direct answer
+        # Stream full decision_content if requested (OpenAI-like SSE)
+        if getattr(request, "stream", False):
+            return StreamingResponse(_single_sse(decision_content), media_type="text/event-stream")
+
         response_content = {
             "id": f"chatcmpl-direct-{os.urandom(8).hex()}",
             "object": "chat.completion",
@@ -229,7 +279,7 @@ Odpovězte 'yes' nebo 'ano' pro spuštění, 'no' nebo 'ne' pro zrušení.
             "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         }
         return JSONResponse(content=response_content)
-            
+        
     except Exception as e:
         logger.error(f"Error in orchestration: {e}")
         raise HTTPException(status_code=500, detail=f"Orchestration error: {str(e)}")

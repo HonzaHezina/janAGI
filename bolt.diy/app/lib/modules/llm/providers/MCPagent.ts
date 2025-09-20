@@ -26,6 +26,8 @@ export default class MCPAgentProvider extends BaseProvider {
     },
   ];
 
+  private sseAccumulatedText = '';
+
   async getDynamicModels(
     apiKeys?: Record<string, string>,
     settings?: IProviderSetting,
@@ -221,6 +223,202 @@ export default class MCPAgentProvider extends BaseProvider {
     return this.streamPlan(planText, 'mcp-orchestrator', onEvent);
   }
 
+  /**
+   * Robust SSE payload handler
+   *
+   * - Parses JSON payloads (objects or arrays)
+   * - Supports OpenAI-like chunks (passes through)
+   * - Supports backend custom objects with "type": progress|step_result|response|usage
+   * - Preserves metadata: messageId, finishReason, isContinued
+   * - Fallback: treat raw text as assistant content
+   */
+  private handleSSEData(payload: string, onEvent: (event: any) => void) {
+    console.debug('[MCPAgent] SSE raw payload:', payload);
+ 
+    // Clean leading prefixes like "f:", "d:", "e:", "2:", "8:", or other token:payload patterns
+    let cleaned = payload;
+    try {
+      const m = cleaned.match(/^[A-Za-z0-9_-]+:(.*)$/s);
+      if (m && m[1] !== undefined) {
+        cleaned = m[1].trim();
+        console.debug('[MCPAgent] SSE cleaned payload (prefix removed):', cleaned);
+      }
+    } catch {}
+ 
+    // Try to parse cleaned payload as JSON; if fails, try original payload; if still fails, fallback later
+    const tryParse = (txt: string) => {
+      try {
+        return JSON.parse(txt);
+      } catch {
+        return null;
+      }
+    };
+ 
+    let parsed = tryParse(cleaned);
+    if (parsed === null && cleaned !== payload) parsed = tryParse(payload);
+ 
+    if (parsed !== null) {
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+ 
+      for (const obj of items) {
+        try {
+          // OpenAI-like chunk (already in expected shape)
+          if (obj && typeof obj === 'object' && obj.id !== undefined && Array.isArray(obj.choices)) {
+            console.debug('[MCPAgent] SSE parsed as openai-like chunk', obj);
+            onEvent(obj);
+            continue;
+          }
+ 
+          // Backend custom typed object handling
+          if (obj && typeof obj === 'object' && typeof obj.type === 'string') {
+            console.debug('[MCPAgent] SSE parsed custom object type=', obj.type, obj);
+  
+            const t = obj.type;
+  
+            // Usage objects: forward as usage event so higher layer can update totals
+            if (t === 'usage') {
+              const usagePayload = obj.value ?? obj.message ?? obj;
+              console.debug('[MCPAgent] Emitting usage event', usagePayload);
+              onEvent({ type: 'usage', usage: usagePayload, metadata: { type: t } });
+              continue;
+            }
+  
+            // If backend signals "Response Generated" or sends a 'response' event with no text,
+            // generate a final assistant message immediately (SSE hotfix).
+            const messageContainsResponseGenerated = typeof obj.message === 'string' && obj.message.includes('Response Generated');
+            const valueHasText = !!(obj.value && (typeof obj.value === 'string' && obj.value.trim() !== '' ||
+              (typeof obj.value === 'object' && typeof obj.value.text === 'string' && obj.value.text.trim() !== '')));
+  
+            if (messageContainsResponseGenerated || (t === 'response' && !valueHasText)) {
+              const preferredText =
+                (obj.value && typeof obj.value === 'object' && typeof obj.value.text === 'string' && obj.value.text.trim() !== '')
+                  ? obj.value.text
+                  : (this.sseAccumulatedText && this.sseAccumulatedText.trim() !== '' ? this.sseAccumulatedText : 'Response Generated');
+  
+              console.debug('[MCPagent S SSE-FIX]', obj, preferredText);
+  
+              const finishReason = obj.finishReason ?? obj.finish_reason ?? 'stop';
+              const respEvent: any = {
+                id: obj.id ?? undefined,
+                choices: [
+                  {
+                    delta: { content: preferredText },
+                    finish_reason: finishReason,
+                  },
+                ],
+                metadata: { type: t },
+              };
+  
+              // Preserve known metadata keys if present
+              for (const k of ['messageId', 'finishReason', 'isContinued']) {
+                if (obj[k] !== undefined) {
+                  respEvent.metadata[k] = obj[k];
+                }
+              }
+  
+              // reset accumulated buffer after emitting final message
+              this.sseAccumulatedText = '';
+  
+              onEvent(respEvent);
+              continue;
+            }
+  
+            // progress | response | step_result -> map to assistant-like chunk
+            let content = '';
+            if (typeof obj.message === 'string') content = obj.message;
+            else if (typeof obj.value === 'string') content = obj.value;
+            else if (obj.value && typeof obj.value === 'object') {
+              // common places to find text
+              if (typeof obj.value.text === 'string') content = obj.value.text;
+              else if (typeof obj.value.content === 'string') content = obj.value.content;
+              else {
+                try {
+                  content = JSON.stringify(obj.value);
+                } catch {
+                  content = String(obj.value);
+                }
+              }
+            } else {
+              // last resort: stringify object or use empty string
+              try {
+                content = JSON.stringify(obj);
+              } catch {
+                content = String(obj);
+              }
+            }
+  
+            // append to accumulator for potential later "Response Generated" trigger
+            try {
+              if (typeof content === 'string' && content.trim() !== '') {
+                this.sseAccumulatedText += (this.sseAccumulatedText ? ' ' : '') + content;
+              }
+            } catch {}
+  
+            const event: any = {
+              // keep compatibility with OpenAI-like streaming chunks
+              id: obj.id ?? undefined,
+              choices: [
+                {
+                  delta: { content },
+                  // pass finish reason if provided by backend
+                  finish_reason: obj.finishReason ?? obj.finish_reason ?? undefined,
+                },
+              ],
+              metadata: {
+                type: t,
+              },
+            };
+  
+            // Preserve known metadata keys if present
+            for (const k of ['messageId', 'finishReason', 'isContinued']) {
+              if (obj[k] !== undefined) {
+                event.metadata[k] = obj[k];
+              }
+            }
+  
+            onEvent(event);
+            continue;
+          }
+ 
+          // Generic object fallback: try to extract readable text
+          if (obj && typeof obj === 'object') {
+            const content = obj.message ?? obj.text ?? obj.content ?? JSON.stringify(obj);
+            const event = {
+              choices: [{ delta: { content } }],
+              metadata: {},
+            };
+            for (const k of ['messageId', 'finishReason', 'isContinued']) {
+              if (obj[k] !== undefined) (event as any).metadata[k] = obj[k];
+            }
+            console.debug('[MCPAgent] Emitting generic object as assistant content', event);
+            onEvent(event);
+            continue;
+          }
+ 
+          // Primitive value -> treat as assistant content
+          console.debug('[MCPAgent] Emitting primitive as assistant content', obj);
+          onEvent({ choices: [{ delta: { content: String(obj) } }] });
+        } catch (innerErr) {
+          logger.error(`handleSSEData inner error: ${innerErr}`);
+          // Emit raw representation as fallback
+          onEvent({ choices: [{ delta: { content: typeof obj === 'string' ? obj : JSON.stringify(obj) } }] });
+        }
+      }
+      return;
+    } else {
+      // Not valid JSON: fallback to treating raw payload as assistant content
+      console.debug('[MCPAgent] SSE payload is not valid JSON, treating raw as assistant content');
+      // Try to strip known prefix before emitting raw
+      let emitRaw = payload;
+      try {
+        const m2 = payload.match(/^[A-Za-z0-9_-]+:(.*)$/s);
+        if (m2 && m2[1] !== undefined) emitRaw = m2[1].trim();
+      } catch {}
+      onEvent({ choices: [{ delta: { content: emitRaw } }] });
+      return;
+    }
+  }
+
   streamPlan(
     planText: string,
     model: string = 'mcp-orchestrator',
@@ -229,7 +427,22 @@ export default class MCPAgentProvider extends BaseProvider {
     const baseUrl = this.config.baseUrl;
     const controller = new AbortController();
     const url = `${baseUrl}/plan/stream`;
-
+  
+    // Wrap onEvent to provide consistent debug logging for every emitted event
+    const emit = (evt: any) => {
+      try {
+        console.debug('[MCPAgent] EMIT event ->', evt);
+      } catch {}
+      try {
+        onEvent(evt);
+        try {
+          console.debug('[MCPAgent] CALLBACK ok ->', evt?.type ?? evt);
+        } catch {}
+      } catch (cbErr) {
+        console.error('[MCPAgent] onEvent callback error', cbErr, evt);
+      }
+    };
+  
     (async () => {
       try {
         const res = await fetch(url, {
@@ -241,24 +454,24 @@ export default class MCPAgentProvider extends BaseProvider {
         if (!res.ok) {
           const txt = await res.text();
           logger.error(`plan_stream failed: ${res.status} - ${txt}`);
-          onEvent({ type: 'error', error: `HTTP ${res.status}: ${txt}` });
+          emit({ type: 'error', error: `HTTP ${res.status}: ${txt}` });
           return;
         }
-
+  
         const reader = res.body?.getReader();
         if (!reader) {
-          onEvent({ type: 'error', error: 'No stream reader available' });
+          emit({ type: 'error', error: 'No stream reader available' });
           return;
         }
-
+  
         const decoder = new TextDecoder();
         let buffer = '';
-
+  
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-
+  
           // SSE frames are separated by double newlines; process complete frames
           let idx;
           while ((idx = buffer.indexOf('\n\n')) !== -1) {
@@ -270,11 +483,11 @@ export default class MCPAgentProvider extends BaseProvider {
               if (line.startsWith('data:')) {
                 const payload = line.slice(5).trim();
                 try {
-                  const parsed = JSON.parse(payload);
-                  onEvent(parsed);
-                } catch (e) {
-                  // not JSON — send raw
-                  onEvent({ raw: payload });
+                  // delegate parsing and mapping to the robust handler
+                  // pass our emit wrapper so handleSSEData logs every emitted event
+                  this.handleSSEData(payload, emit);
+                } catch (err) {
+                  logger.error(`SSE parsing error: ${err}`);
                 }
               } else {
                 // ignore other SSE meta lines
@@ -282,7 +495,7 @@ export default class MCPAgentProvider extends BaseProvider {
             }
           }
         }
-
+  
         // flush remaining buffer if any
         if (buffer.trim()) {
           const lines = buffer.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -290,26 +503,25 @@ export default class MCPAgentProvider extends BaseProvider {
             if (line.startsWith('data:')) {
               const payload = line.slice(5).trim();
               try {
-                const parsed = JSON.parse(payload);
-                onEvent(parsed);
-              } catch {
-                onEvent({ raw: payload });
+                this.handleSSEData(payload, emit);
+              } catch (err) {
+                logger.error(`SSE parsing error (flush): ${err}`);
               }
             }
           }
         }
-
-        onEvent({ type: 'finished' });
+  
+        emit({ type: 'finished' });
       } catch (err: any) {
         if (err.name === 'AbortError') {
-          onEvent({ type: 'cancelled' });
+          emit({ type: 'cancelled' });
         } else {
           logger.error(`streamPlan error: ${err}`);
-          onEvent({ type: 'error', error: String(err) });
+          emit({ type: 'error', error: String(err) });
         }
       }
     })();
-
+  
     return {
       cancel: () => controller.abort(),
     };
