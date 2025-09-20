@@ -23,7 +23,7 @@ Hlavní principy
    - Vizualizace diffů, náhledů a logů agentů v reálném čase.
    - Komponenta AgentOutputViewer zobrazuje výstupy konkrétních tasků a umožňuje editovat kód agentů.
 
-5. OWL jako orchestrátor
+5. Mcp-agent jako orchestrátor
    - Zpracovává spuštění tasků podle plánu (např. API `/api/run_agent`, `/api/plan`, `/v1/plan/stream`).
    - Obsahuje PlannerAgent (hlavní mozek) a AgentCodeWriter (generování dalších agentů).
    - Snadné rozšíření o testovací a CI/CD agenty.
