@@ -4,22 +4,35 @@ Simplified version with modular imports.
 """
 
 import time
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-
+import json
+import os
+from pathlib import Path
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+ 
 try:
     # Try relative imports first (when run as module)
-    from .config import logger, LLM_PROVIDER, DEFAULT_MODELS
+    from .config import logger, LLM_PROVIDER, DEFAULT_MODELS, AGENTS_DIR
     from .models import ChatCompletionRequest
     from .agents import load_all_agents
-    from .orchestration import orchestrate_response, handle_plan_execution, handle_agent_call
+    from .orchestration import (
+        orchestrate_response,
+        handle_plan_execution,
+        handle_agent_call,
+        execute_plan_stream,
+    )
     from . import __version__, __title__
 except ImportError:
     # Fall back to absolute imports (when run as script)
-    from config import logger, LLM_PROVIDER, DEFAULT_MODELS
+    from config import logger, LLM_PROVIDER, DEFAULT_MODELS, AGENTS_DIR
     from models import ChatCompletionRequest
     from agents import load_all_agents
-    from orchestration import orchestrate_response, handle_plan_execution, handle_agent_call
+    from orchestration import (
+        orchestrate_response,
+        handle_plan_execution,
+        handle_agent_call,
+        execute_plan_stream,
+    )
     from __init__ import __version__, __title__
 
 

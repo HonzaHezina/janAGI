@@ -24,7 +24,7 @@ AGENTS_DIR = "agents"
 
 # --- LLM Provider Configuration ---
 # Hlavní LLM provider pro orchestraci (lze změnit)
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "huggingface")  # Switch to HuggingFace due to Gemini quota
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")  # Default to Gemini
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gpt2")
 
 # API konfigurace

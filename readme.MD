@@ -1,121 +1,60 @@
-# 🧠 janAGI – Open-source AI Agent Orchestration Framework
+## janAGI — Open-source AI Agent Orchestration Framework
 
-> ✨ Pracuj se záměrem. Neřeš nástroje.  
-> 🛠 Powered by [mcp-agent](https://github.com/lastmile-ai/mcp-agent)  
-> 💬 Frontend přes [Bolt.diy](https://github.com/menloresearch/bolt.diy)
+janAGI přináší nový mentální model práce s umělou inteligencí: neřešíte nástroje ani agenty, ale záměr a výsledky. Uživatel zadá jednoduchý záměr (např. „Vytvoř landing page pro pastelovou čajovnu“) a systém provede zbytek — navrhne plán, přiřadí agenty, požádá o potvrzení a poté bezpečně orchestruje exekuci.
 
----
+Hlavní principy
+1. Hlavní LLM jako centrální mozek
+   - Uchovává kontext úlohy: zadání, záměr, mezikroky a uživatelské preference.
+   - Pokud dokáže odpovědět přímo, odpoví jako klasický chatbot.
+   - Pokud potřebuje vykonat tasky, vytvoří strukturovaný plán (JSON) a navrhne agenty pro každý krok.
 
-## 🇨🇿 Popis projektu (Czech)
+2. Agenti vykonávají úlohy, neplánují
+   - Každý agent má jasně definované schopnosti (např. run/task rozhraní).
+   - Agenti pouze vykonávají přidělené úkoly (AgentCodeWriter, AgentImageGen, AgentScraper, …).
+   - Nové agenty lze generovat dynamicky (AgentCodeWriter) a ihned upravit ve frontendovém editoru.
 
-### ✨ Vize
-janAGI přináší nový mentální model práce s umělou inteligencí.  
-📌 Nepracuješ s nástroji nebo agenty. Pracuješ se **záměrem**.  
-LLM vyhodnotí, zda umí odpovědět sám, nebo musí vytvořit **plán**, který vykonají specializovaní agenti.
+3. Planner LLM se učí nové agenty
+   - Každý agent obsahuje metadata a popis schopností (např. `agent.yaml`).
+   - Planner LLM se naučí využívat nového agenta přes metadata a krátké runtime testy.
+   - Rozšiřování systému je konverzační: nový agent se objeví v Bolt.diy pro úpravy a ladění.
 
----
+4. Bolt.diy jako frontend
+   - UI pro zadávání záměrů, schvalování plánů a sledování průběhu.
+   - Vizualizace diffů, náhledů a logů agentů v reálném čase.
+   - Komponenta AgentOutputViewer zobrazuje výstupy konkrétních tasků a umožňuje editovat kód agentů.
 
-### 🧩 Architektura
+5. OWL jako orchestrátor
+   - Zpracovává spuštění tasků podle plánu (např. API `/api/run_agent`, `/api/plan`, `/v1/plan/stream`).
+   - Obsahuje PlannerAgent (hlavní mozek) a AgentCodeWriter (generování dalších agentů).
+   - Snadné rozšíření o testovací a CI/CD agenty.
 
-- 🧠 **Planner agent (LLM)** – centrální mozek systému
-- 🤖 **Funkční agenti** – např. `AgentCodeWriter`, `AgentImageGen`
-- 📦 **mcp-agent** – orchestrace agentů
-- 🧑‍💻 **Bolt.diy** – uživatelské rozhraní pro zadání, potvrzení a sledování úloh
+Průběh workflow (zjednodušeně)
+- Uživatel zadá záměr.
+- Planner LLM analyzuje a vrátí strukturovaný plán (JSON).
+- UI zobrazí plán ke schválení.
+- Po schválení OWL orchestruje tasky pomocí dedikovaných agentů.
+- Výstupy agentů jsou streamovány do UI; planner agreguje finální odpověď.
 
----
+MVP (hackathon scope)
+- Bolt.diy jako FE s AgentOutputViewer.
+- OWL s PlannerAgent a AgentCodeWriter.
+- Napojení frontend ↔ backend přes API (plánování, streamování exekuce).
+- Jeden funkční agent a základní plánování úlohy.
 
-### 🔁 Jak to funguje
+Proč je to jiné?
+- Fokus na záměr → výsledky (not tool-first).
+- Chat-first plánování s node-based vizualizací a dynamickou tvorbou agentů.
+- Open-source middleware kompatibilní s existujícími MCP nástroji.
 
-1. Uživatel zadá **záměr** (např. „Vytvoř mi landing page s obrázky“)
-2. LLM vyhodnotí, zda odpoví rovnou, nebo:
-   - Vytvoří plán (`plan = [task1, task2, ...]`)
-   - Vybere agenty a přidělí úkoly
-   - Po schválení spustí plán přes `mcp-agent`
-3. Výstupy agentů se streamují zpět do Bolt.diy UI
+Use-casy
+- Rychlé prototypování AI nástrojů.
+- Interní agentní systémy pro firmy.
+- Asistent pro produktové týmy: „Zadej výsledek, AI udělá zbytek.“
 
----
-
-### 🧠 Komponenty
-
-- `planner.agent.yaml` – definuje hlavní LLM plánovač
-- `*.agent.yaml` – definice jednotlivých agentů (kód, obrázky, texty, scraping...)
-- `bolt.diy` – frontend s komponentami `AgentOutputViewer`, `PlanViewer`, `DiffView`
-- `mcp-agent` – middleware pro plánování, spouštění a koordinaci agentů
-
----
-
-### 🧱 MVP
-
-✅ Bolt.diy jako frontend  
-✅ Planner LLM jako agent přes MCP  
-✅ Jeden funkční agent (`AgentCodeWriter`)  
-✅ YAML popis agentů (`agent.yaml`)  
-✅ API napojení frontend ↔ backend  
-
----
-
-## 🇬🇧 Project Overview (English)
-
-### ✨ Vision
-janAGI introduces a new mental model for working with AI.  
-You don’t operate tools – you **declare intent**.  
-The system either answers directly (via LLM) or dynamically creates a **plan** and executes it using agents.
+Další kroky (doporučené)
+- Přidat AgentImageGen a další specializované agenty.
+- Definovat `agent.yaml` pro každý agent, aby se usnadnilo auto-učení Planneru.
+- Přidat tutorial scénáře (např. „Vytvoř web s generovanými obrázky“).
+- Připravit bezpečný sandbox / validační pipeline pro upload kódu agentů.
 
 ---
-
-### 🧩 Architecture
-
-- 🧠 **Planner Agent (LLM)** – central orchestrator
-- 🤖 **Functional Agents** – like `AgentCodeWriter`, `AgentImageGen`
-- 📦 **mcp-agent** – lightweight agent orchestrator
-- 🧑‍💻 **Bolt.diy** – frontend for intent input, plan confirmation, and result visualization
-
----
-
-### 🔁 How it works
-
-1. User submits **intent** (e.g., "Create a landing page with images")
-2. LLM decides:
-   - If it can answer directly → responds like a chatbot
-   - If task is complex → creates a plan (series of steps + agents)
-3. Plan is shown in UI and confirmed by user
-4. After confirmation, tasks are executed via `mcp-agent`
-5. Agent outputs are streamed to Bolt.diy in real time
-
----
-
-### 🧠 Components
-
-- `planner.agent.yaml` – defines main LLM planner
-- `*.agent.yaml` – defines agents (code, image, text, scraping...)
-- `bolt.diy` – user interface (React + Tailwind)
-- `mcp-agent` – FastAPI backend for agent orchestration
-
----
-
-### 🧱 MVP Scope
-
-✅ Bolt.diy as frontend  
-✅ Planner agent running via `mcp-agent`  
-✅ One working agent (`AgentCodeWriter`)  
-✅ agent.yaml schema for agent definitions  
-✅ REST API communication between frontend & backend  
-
----
-
-## 🌱 Get Involved
-
-We are building janAGI as an open-source framework to support:
-- 🛠 Rapid AI prototyping
-- 🔌 Agent-based system integration
-- 🤖 Internal AI assistants for teams
-- 📚 Education in LLM orchestration
-
-> 💡 Pull requests, issues, and ideas are welcome!
-
----
-
-## 📄 License
-
-MIT License – use freely, modify, and build your own agents.
-
