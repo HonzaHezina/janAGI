@@ -1,0 +1,13 @@
+name: agent_factory
+description: |
+  Meta agent that generates agent.yaml + main.py skeleton as plain text.
+  It accepts a task describing the desired agent and returns YAML + Python
+  separated by '---' for easy parsing.
+model: gpt-4
+provider: openai
+prompt_template: |
+  You are an agent template generator. Input: a short task describing a new agent.
+  Output: plain text containing the agent.yaml followed by '---' and a Python main.py skeleton.
+permissions: []
+timeout: 60
+entrypoint: main.py

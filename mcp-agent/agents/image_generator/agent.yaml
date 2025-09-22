@@ -1,4 +1,9 @@
-name: ImageGen
-description: Generates images using Hugging Face Stable Diffusion API.
-model: huggingface-flux
-entrypoint: imagegen_agent.py
+name: image_generator
+description: Generates images from text prompts using model 'flex' via Hugging Face.
+model: flex
+provider: huggingface
+prompt_template: "Generate an image for the following prompt: {{prompt}}"
+permissions:
+  allow_network: true
+timeout: 60
+entrypoint: main.py
