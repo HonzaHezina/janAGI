@@ -13,11 +13,13 @@ from fastapi import HTTPException
 try:
     from .models import ChatCompletionRequest, Message
     from .config import (logger, GEMINI_API_BASE, HUGGINGFACE_API_BASE, OPENAI_API_BASE,
-                        GEMINI_API_KEY, HUGGINGFACE_API_KEY, OPENAI_API_KEY)
+                        GEMINI_API_KEY, HUGGINGFACE_API_KEY, OPENAI_API_KEY,
+                        MISTRAL_API_BASE, MISTRAL_API_KEY)
 except ImportError:
     from models import ChatCompletionRequest, Message
     from config import (logger, GEMINI_API_BASE, HUGGINGFACE_API_BASE, OPENAI_API_BASE,
-                       GEMINI_API_KEY, HUGGINGFACE_API_KEY, OPENAI_API_KEY)
+                       GEMINI_API_KEY, HUGGINGFACE_API_KEY, OPENAI_API_KEY,
+                       MISTRAL_API_BASE, MISTRAL_API_KEY)
 
 
 class LLMProvider(abc.ABC):
@@ -336,67 +338,226 @@ class OpenAIProvider(LLMProvider):
 
 class MistralProvider(LLMProvider):
     """
-    Minimal Mistral provider implementation for 'codestral' model family.
-    Uses environment variables MISTRAL_API_KEY and optional MISTRAL_API_BASE.
-    This is a lightweight implementation intended as a starting point; adapt
-    to the exact Mistral API spec you use.
+    Production-ready Mistral provider for 'codestral' family:
+    - Uses configured MISTRAL_API_KEY / MISTRAL_API_BASE from config.py
+    - Retries on transient errors with exponential backoff
+    - Robust streaming parsing and normalized OpenAI-like chunks
+    - Clear error handling for 4xx vs 5xx
     """
     def __init__(self, model_name: str):
         super().__init__(model_name)
-        self.api_key = os.getenv("MISTRAL_API_KEY")
+        # Prefer explicit config values, fall back to env
+        self.api_key = MISTRAL_API_KEY or os.getenv("MISTRAL_API_KEY")
+        self.api_base = MISTRAL_API_BASE or os.getenv("MISTRAL_API_BASE", "https://api.mistral.ai")
         if not self.api_key:
             raise ValueError("MISTRAL_API_KEY environment variable not set")
-        self.api_base = os.getenv("MISTRAL_API_BASE", "https://api.mistral.ai")
+        # Retry settings
+        self._max_retries = 3
+        self._backoff_factor = 0.5  # seconds
 
     def _format_messages(self, messages: List[Message]) -> str:
+        # Convert messages to a single prompt string expected by Mistral
         conversation = ""
         for msg in messages:
-            conversation += f"{msg.role.capitalize()}: {msg.content}\n"
+            role = msg.role.capitalize() if hasattr(msg, "role") else "User"
+            conversation += f"{role}: {msg.content}\n"
         conversation += "Assistant: "
         return conversation
+
+    async def _request_with_retries(self, method: str, url: str, headers: Dict[str, str], json_data: Dict[str, Any], timeout: float = 60.0):
+        attempt = 0
+        while True:
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.request(method, url, headers=headers, json=json_data, timeout=timeout)
+                    response.raise_for_status()
+                    return response
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                text = e.response.text
+                # Client errors - do not retry
+                if 400 <= status < 500:
+                    logger.error(f"Mistral API client error ({status}): {text}")
+                    raise HTTPException(status_code=status, detail=f"Mistral API client error: {text}")
+                # Server errors - retry up to limit
+                attempt += 1
+                logger.warning(f"Mistral API server error ({status}) on attempt {attempt}: {text}")
+                if attempt >= self._max_retries:
+                    logger.error(f"Mistral API failed after {attempt} attempts: {text}")
+                    raise HTTPException(status_code=status, detail=f"Mistral API server error after retries: {text}")
+                await self._sleep_backoff(attempt)
+            except (httpx.RequestError, Exception) as e:
+                attempt += 1
+                logger.warning(f"Mistral request error on attempt {attempt}: {e}")
+                if attempt >= self._max_retries:
+                    logger.error(f"Mistral API request failed after {attempt} attempts: {e}")
+                    raise HTTPException(status_code=500, detail=f"Mistral API request failed: {e}")
+                await self._sleep_backoff(attempt)
+
+    async def _sleep_backoff(self, attempt: int):
+        await __import__("asyncio").sleep(self._backoff_factor * (2 ** (attempt - 1)))
 
     async def generate(self, request: ChatCompletionRequest) -> Dict[str, Any]:
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         prompt = self._format_messages(request.messages)
-        data = {"model": self.model_name, "input": prompt, "max_tokens": request.max_tokens, "temperature": request.temperature}
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(f"{self.api_base}/v1/generate", headers=headers, json=data, timeout=60.0)
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Mistral API error: {e.response.text}")
-                raise HTTPException(status_code=e.response.status_code, detail=f"Mistral API error: {e.response.text}")
+        payload = {
+            "model": self.model_name,
+            "input": prompt,
+            "max_tokens": request.max_tokens or 512,
+            "temperature": request.temperature or 0.7
+        }
+        url = f"{self.api_base.rstrip('/')}/v1/generate"
+        resp = await self._request_with_retries("POST", url, headers, payload, timeout=60.0)
+        try:
+            return resp.json()
+        except Exception:
+            text = await resp.text()
+            logger.error(f"Failed to decode Mistral response JSON: {text}")
+            raise HTTPException(status_code=500, detail="Invalid JSON from Mistral API")
 
     async def stream_generate(self, request: ChatCompletionRequest) -> AsyncGenerator[str, None]:
-        api_url = f"{self.api_base}/v1/generate?stream=true"
+        """
+        Stream generate: handles line-delimited / SSE-like streaming responses and
+        yields OpenAI-like chunks: 'data: {...}\\n\\n' and final 'data: [DONE]'.
+        """
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        data = {"model": self.model_name, "input": self._format_messages(request.messages), "max_tokens": request.max_tokens, "temperature": request.temperature}
-        async with httpx.AsyncClient() as client:
+        payload = {
+            "model": self.model_name,
+            "input": self._format_messages(request.messages),
+            "max_tokens": request.max_tokens or 512,
+            "temperature": request.temperature or 0.7,
+            "stream": True
+        }
+        url = f"{self.api_base.rstrip('/')}/v1/generate"
+        attempt = 0
+        while True:
             try:
-                async with client.stream("POST", api_url, headers=headers, json=data, timeout=60.0) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if line:
-                            chunk = {
-                                "id": f"chatcmpl-mistral-{os.urandom(6).hex()}",
-                                "object": "chat.completion.chunk",
-                                "created": int(time.time()),
-                                "model": self.model_name,
-                                "choices": [{"index": 0, "delta": {"content": line}, "finish_reason": None}]
-                            }
-                            yield f"data: {json.dumps(chunk)}\n\n"
+                async with httpx.AsyncClient() as client:
+                    async with client.stream("POST", url, headers=headers, json=payload, timeout=120.0) as response:
+                        response.raise_for_status()
+                        buffer = ""
+                        async for raw_line in response.aiter_lines():
+                            if raw_line is None:
+                                continue
+                            line = raw_line.strip()
+                            if not line:
+                                continue
+                            # Mistral streaming may send json objects per line or SSE-style "data: {...}"
+                            if line.startswith("data: "):
+                                line = line[len("data: "):]
+                            try:
+                                obj = json.loads(line)
+                            except Exception:
+                                # yield raw text as chunk
+                                obj = {"text": line}
+                            # Try to extract text from known shapes
+                            text_chunk = ""
+                            if isinstance(obj, dict):
+                                # Common newer Mistral shape: {"outputs":[{"content":[{"type":"output_text","text":"..."}]}]}
+                                outputs = obj.get("outputs") or obj.get("output") or obj.get("generations")
+                                if outputs and isinstance(outputs, list):
+                                    first = outputs[0]
+                                    content = first.get("content") if isinstance(first, dict) else None
+                                    if isinstance(content, list):
+                                        parts = []
+                                        for block in content:
+                                            if isinstance(block, dict):
+                                                parts.append(block.get("text") or block.get("content") or "")
+                                            else:
+                                                parts.append(str(block))
+                                        text_chunk = "".join(parts)
+                                    elif isinstance(first, dict) and "text" in first:
+                                        text_chunk = first.get("text", "")
+                                elif "text" in obj:
+                                    text_chunk = obj.get("text", "")
+                                elif "generated_text" in obj:
+                                    text_chunk = obj.get("generated_text", "")
+                                else:
+                                    # fallback to stringifying object
+                                    text_chunk = str(obj)
+                            else:
+                                text_chunk = str(obj)
+                            if text_chunk:
+                                chunk = {
+                                    "id": f"chatcmpl-mistral-{os.urandom(6).hex()}",
+                                    "object": "chat.completion.chunk",
+                                    "created": int(time.time()),
+                                    "model": self.model_name,
+                                    "choices": [{"index": 0, "delta": {"content": text_chunk}, "finish_reason": None}]
+                                }
+                                yield f"data: {json.dumps(chunk)}\n\n"
+                        # final chunk
+                        final_chunk = {
+                            "id": f"chatcmpl-mistral-{os.urandom(6).hex()}",
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": self.model_name,
+                            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]
+                        }
+                        yield f"data: {json.dumps(final_chunk)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
             except httpx.HTTPStatusError as e:
-                logger.error(f"Mistral API streaming error: {e.response.text}")
-                error_message = {"error": {"message": f"Mistral API error: {e.response.text}", "type": "api_error", "code": e.response.status_code}}
-                yield f"data: {json.dumps(error_message)}\n\n"
+                status = e.response.status_code
+                text = e.response.text
+                # client errors - surface and finish stream
+                if 400 <= status < 500:
+                    logger.error(f"Mistral streaming client error ({status}): {text}")
+                    error_message = {"error": {"message": f"Mistral API error: {text}", "type": "api_error", "code": status}}
+                    yield f"data: {json.dumps(error_message)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                attempt += 1
+                logger.warning(f"Mistral streaming server error ({status}) attempt {attempt}: {text}")
+                if attempt >= self._max_retries:
+                    error_message = {"error": {"message": f"Mistral API streaming error after retries: {text}", "type": "api_error", "code": status}}
+                    yield f"data: {json.dumps(error_message)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                await self._sleep_backoff(attempt)
+            except (httpx.RequestError, Exception) as e:
+                attempt += 1
+                logger.warning(f"Mistral streaming request error on attempt {attempt}: {e}")
+                if attempt >= self._max_retries:
+                    error_message = {"error": {"message": f"Mistral streaming request failed: {e}", "type": "server_error"}}
+                    yield f"data: {json.dumps(error_message)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                await self._sleep_backoff(attempt)
 
     def _extract_content(self, response: Dict[str, Any]) -> str:
+        """
+        Robust extraction for several potential Mistral response shapes.
+        """
         try:
+            if not response:
+                return ""
+            # Newer shape: {"outputs":[{"content":[{"type":"output_text","text":"..."}]}]}
             if isinstance(response, dict):
-                if "output" in response and isinstance(response["output"], list):
-                    return response["output"][0].get("content", "") if response["output"] else ""
-                return response.get("generated_text") or response.get("text") or str(response)
+                outputs = response.get("outputs") or response.get("output") or response.get("generations")
+                if outputs and isinstance(outputs, list):
+                    first = outputs[0]
+                    content = first.get("content") if isinstance(first, dict) else None
+                    if isinstance(content, list):
+                        texts = []
+                        for block in content:
+                            if isinstance(block, dict):
+                                texts.append(block.get("text") or block.get("content") or "")
+                            else:
+                                texts.append(str(block))
+                        return "".join(texts)
+                    # fallback if first has text key
+                    if isinstance(first, dict) and "text" in first:
+                        return first.get("text", "")
+                # legacy keys
+                if "generated_text" in response:
+                    return response.get("generated_text", "")
+                if "text" in response:
+                    return response.get("text", "")
+                # attempt to stringify useful keys
+                for key in ("output", "outputs", "generations"):
+                    if key in response:
+                        return str(response[key])
             return str(response)
         except Exception as e:
             logger.error(f"MistralProvider _extract_content error: {e}")

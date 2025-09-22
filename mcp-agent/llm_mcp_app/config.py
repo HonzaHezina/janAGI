@@ -32,6 +32,9 @@ GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 HUGGINGFACE_API_BASE = "https://api-inference.huggingface.co/models"
 OPENAI_API_BASE = "https://api.openai.com/v1"
 
+# Mistral / Codestral configuration
+MISTRAL_API_BASE = os.getenv("MISTRAL_API_BASE", "https://api.mistral.ai")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 # API klíče
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY") or os.getenv("HF_TOKEN")  # Support both names
