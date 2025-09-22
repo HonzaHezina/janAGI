@@ -1,0 +1,12 @@
+name: agent_creator
+description: |
+  Agent that creates new agent directories and files from a spec dict.
+  Validates spec and writes agent.yaml and main.py for the new agent.
+model: gpt-4
+provider: openai
+prompt_template: |
+  Input: JSON or dict with keys name, description, model, provider, prompt_template, permissions, timeout, entrypoint.
+  Output: JSON object describing creation result.
+permissions: []
+timeout: 120
+entrypoint: main.py

@@ -334,13 +334,81 @@ class OpenAIProvider(LLMProvider):
             return ""
 
 
-def get_provider(model_name: str) -> LLMProvider:
-    """Factory function to get the appropriate LLM provider.
+class MistralProvider(LLMProvider):
+    """
+    Minimal Mistral provider implementation for 'codestral' model family.
+    Uses environment variables MISTRAL_API_KEY and optional MISTRAL_API_BASE.
+    This is a lightweight implementation intended as a starting point; adapt
+    to the exact Mistral API spec you use.
+    """
+    def __init__(self, model_name: str):
+        super().__init__(model_name)
+        self.api_key = os.getenv("MISTRAL_API_KEY")
+        if not self.api_key:
+            raise ValueError("MISTRAL_API_KEY environment variable not set")
+        self.api_base = os.getenv("MISTRAL_API_BASE", "https://api.mistral.ai")
 
-    This function attempts to create a real provider (Gemini/HuggingFace/OpenAI)
-    but falls back to a DummyProvider if required credentials are missing or
-    provider initialization fails. This prevents server crashes when API keys
-    are not configured.
+    def _format_messages(self, messages: List[Message]) -> str:
+        conversation = ""
+        for msg in messages:
+            conversation += f"{msg.role.capitalize()}: {msg.content}\n"
+        conversation += "Assistant: "
+        return conversation
+
+    async def generate(self, request: ChatCompletionRequest) -> Dict[str, Any]:
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        prompt = self._format_messages(request.messages)
+        data = {"model": self.model_name, "input": prompt, "max_tokens": request.max_tokens, "temperature": request.temperature}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(f"{self.api_base}/v1/generate", headers=headers, json=data, timeout=60.0)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Mistral API error: {e.response.text}")
+                raise HTTPException(status_code=e.response.status_code, detail=f"Mistral API error: {e.response.text}")
+
+    async def stream_generate(self, request: ChatCompletionRequest) -> AsyncGenerator[str, None]:
+        api_url = f"{self.api_base}/v1/generate?stream=true"
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        data = {"model": self.model_name, "input": self._format_messages(request.messages), "max_tokens": request.max_tokens, "temperature": request.temperature}
+        async with httpx.AsyncClient() as client:
+            try:
+                async with client.stream("POST", api_url, headers=headers, json=data, timeout=60.0) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line:
+                            chunk = {
+                                "id": f"chatcmpl-mistral-{os.urandom(6).hex()}",
+                                "object": "chat.completion.chunk",
+                                "created": int(time.time()),
+                                "model": self.model_name,
+                                "choices": [{"index": 0, "delta": {"content": line}, "finish_reason": None}]
+                            }
+                            yield f"data: {json.dumps(chunk)}\n\n"
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Mistral API streaming error: {e.response.text}")
+                error_message = {"error": {"message": f"Mistral API error: {e.response.text}", "type": "api_error", "code": e.response.status_code}}
+                yield f"data: {json.dumps(error_message)}\n\n"
+
+    def _extract_content(self, response: Dict[str, Any]) -> str:
+        try:
+            if isinstance(response, dict):
+                if "output" in response and isinstance(response["output"], list):
+                    return response["output"][0].get("content", "") if response["output"] else ""
+                return response.get("generated_text") or response.get("text") or str(response)
+            return str(response)
+        except Exception as e:
+            logger.error(f"MistralProvider _extract_content error: {e}")
+            return ""
+
+def get_provider(model_name: str = None, provider_override: str = None) -> LLMProvider:
+    """Factory to get the appropriate LLM provider.
+
+    Accepts an optional provider_override (e.g. "openai", "huggingface", "gemini", "mistral").
+    If provider_override is provided it will be used to select the provider implementation;
+    otherwise provider is detected heuristically from model_name. Falls back to DummyProvider
+    on instantiation errors.
     """
     # Local helper: safe instantiation with fallback
     def _safe_instantiate(provider_cls, *args, **kwargs):
@@ -350,8 +418,30 @@ def get_provider(model_name: str) -> LLMProvider:
             logger.warning(f"Failed to instantiate {provider_cls.__name__}: {e}. Using DummyProvider fallback.")
             return DummyProvider(args[0] if args else "unknown")
 
+    # Normalize inputs
+    pname = provider_override.lower() if provider_override else None
+    mname = model_name or ""
+
+    # If an explicit provider override is requested, prefer it
+    if pname:
+        try:
+            from .config import DEFAULT_MODELS
+        except ImportError:
+            from config import DEFAULT_MODELS
+
+        default_model = mname or DEFAULT_MODELS.get(pname, DEFAULT_MODELS.get("openai", mname or ""))
+        if pname == "huggingface":
+            return _safe_instantiate(HuggingFaceProvider, default_model)
+        elif pname == "openai":
+            return _safe_instantiate(OpenAIProvider, default_model)
+        elif pname == "mistral":
+            return _safe_instantiate(MistralProvider, default_model or mname or "codestral")
+        else:
+            # Default to Gemini for unknown override
+            return _safe_instantiate(GeminiProvider, default_model or mname or "gemini-1.5-flash")
+
     # Special handling for mcp-orchestrator - use configured provider
-    if model_name == "mcp-orchestrator":
+    if mname == "mcp-orchestrator":
         try:
             from .config import LLM_PROVIDER, DEFAULT_MODELS
         except ImportError:
@@ -367,20 +457,24 @@ def get_provider(model_name: str) -> LLMProvider:
         else:
             return _safe_instantiate(GeminiProvider, default_model)
 
-    # Regular model detection
+    # Regular model detection (heuristic)
     try:
-        lname = model_name.lower()
+        lname = mname.lower()
     except Exception:
         lname = ""
 
+    # Detect Mistral / codestral model name explicitly
+    if "codestral" in lname or "mistral" in lname:
+        return _safe_instantiate(MistralProvider, mname)
+
     if "gemini" in lname:
-        return _safe_instantiate(GeminiProvider, model_name)
+        return _safe_instantiate(GeminiProvider, mname)
     elif "gpt" in lname or "openai" in lname:
-        return _safe_instantiate(OpenAIProvider, model_name)
-    elif "huggingface" in lname or "/" in model_name:  # HF modely často mají formát "author/model"
-        return _safe_instantiate(HuggingFaceProvider, model_name)
+        return _safe_instantiate(OpenAIProvider, mname)
+    elif "huggingface" in lname or "/" in mname:  # HF models often have "author/model"
+        return _safe_instantiate(HuggingFaceProvider, mname)
     else:
-        # Výchozí provider na základě konfigurace
+        # Default provider based on configuration
         try:
             from .config import LLM_PROVIDER, DEFAULT_MODELS
         except ImportError:

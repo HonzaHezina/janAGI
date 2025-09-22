@@ -7,6 +7,12 @@ import importlib.util
 from pathlib import Path
 from typing import Dict
 
+# Optional YAML parsing for agent metadata; if PyYAML is not installed we skip parsing
+try:
+    import yaml
+except Exception:
+    yaml = None
+
 try:
     from mcp_agent.agents.agent import Agent
 except ImportError as e:
@@ -47,8 +53,24 @@ def load_all_agents(agents_dir: str = AGENTS_DIR) -> Dict[str, Agent]:
                     continue
                 spec.loader.exec_module(agent_module)
 
+                # Try to load agent metadata from agent.yaml if present
+                agent_config = {}
+                agent_yaml_path = agent_path / "agent.yaml"
+                if agent_yaml_path.is_file():
+                    try:
+                        if yaml:
+                            agent_config = yaml.safe_load(agent_yaml_path.read_text(encoding='utf-8')) or {}
+                        else:
+                            logger.warning(f"PyYAML not installed; skipping parsing of {agent_yaml_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to parse {agent_yaml_path}: {e}")
+
                 if hasattr(agent_module, "get_agent"):
-                    agent_instance = agent_module.get_agent()
+                    # Prefer calling get_agent with agent_config if supported; fall back to no-arg call
+                    try:
+                        agent_instance = agent_module.get_agent(agent_config=agent_config)
+                    except TypeError:
+                        agent_instance = agent_module.get_agent()
                     agents[agent_name] = agent_instance
                     logger.info(f"Successfully loaded agent: {agent_name}")
                 else:

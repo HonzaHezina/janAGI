@@ -1,4 +1,14 @@
 name: CodeWriter
 description: Writes code based on task input.
-model: gpt-4
-entrypoint: code_writer.py
+model: codestral
+provider: mistral
+# Prompt template used by this agent to build final prompt (supports simple {{task}} variable)
+prompt_template: |
+  You are the CodeWriter agent. Receive the user task and generate correct, readable code.
+  Follow best practices, include comments and tests when appropriate.
+  Task: {{task}}
+permissions:
+  allow_network: false   # agents should not access network by default
+  max_runtime_seconds: 30
+timeout: 30
+entrypoint: main.py

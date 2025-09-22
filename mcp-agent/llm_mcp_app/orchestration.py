@@ -23,11 +23,11 @@ except ImportError as e:
 try:
     from .models import ChatCompletionRequest, Message
     from .providers import get_provider
-    from .config import logger, LLM_PROVIDER, DEFAULT_MODELS
+    from .config import logger, LLM_PROVIDER, DEFAULT_MODELS, AGENTS_DIR
 except ImportError:
     from models import ChatCompletionRequest, Message
     from providers import get_provider
-    from config import logger, LLM_PROVIDER, DEFAULT_MODELS
+    from config import logger, LLM_PROVIDER, DEFAULT_MODELS, AGENTS_DIR
 
 
 def _extract_first_json(text: str):
@@ -111,6 +111,18 @@ async def orchestrate_response(request: ChatCompletionRequest, agents: Dict[str,
     
     user_message = request.messages[-1].content if request.messages else ""
     
+    # Handle quick "show agent" chat commands: if user wrote e.g. "zobraz mi kod agenta X",
+    # return agent files immediately without orchestration.
+    try:
+        show_response = await handle_show_agent_request(request)
+        if show_response:
+            return show_response
+    except Exception as e:
+        try:
+            logger.error(f"Error in show_agent handler: {e}")
+        except Exception:
+            pass
+
     # Create system prompt for decision making
     # NOTE: We now prefer a machine-readable JSON response. If the assistant can
     # answer directly, return a JSON object: {"direct_answer": "..."}.
@@ -454,6 +466,62 @@ async def execute_plan_stream(plan_text: str, model: str, agents: Dict[str, Agen
 
     # Finished
     yield {"type": "finished"}
+
+async def handle_show_agent_request(request: ChatCompletionRequest) -> Optional[JSONResponse]:
+    """
+    Detect natural-language requests like "zobraz mi kod agenta <name>" and return agent files.
+    Returns JSONResponse with assistant-style chat completion containing agent files, or None.
+    """
+    if not request.messages or not request.messages[-1].content:
+        return None
+    import re
+    last = request.messages[-1].content.strip()
+    # Czech and English patterns: "zobraz/ukaz/show ... kod agent <name>"
+    m = re.search(r"\b(?:zobraz|ukaz|ukaž|ukažte|show|display)\b.*kod.*agent(?:a)?\s+([A-Za-z0-9_\-]+)", last, re.I)
+    if not m:
+        return None
+    agent_name = m.group(1)
+    agent_dir = os.path.join(AGENTS_DIR, agent_name)
+    main_py = os.path.join(agent_dir, "main.py")
+    yaml_py = os.path.join(agent_dir, "agent.yaml")
+    if not os.path.isdir(agent_dir):
+        return JSONResponse(status_code=404, content={"detail": f"Agent '{agent_name}' not found"})
+    code_text = ""
+    yaml_text = ""
+    try:
+        if os.path.isfile(main_py):
+            with open(main_py, "r", encoding="utf-8") as f:
+                code_text = f.read()
+        if os.path.isfile(yaml_py):
+            with open(yaml_py, "r", encoding="utf-8") as f:
+                yaml_text = f.read()
+    except Exception as e:
+        logger.error(f"Error reading agent files for {agent_name}: {e}")
+        return JSONResponse(status_code=500, content={"detail": "Failed to read agent files"})
+    # Return structured JSON inside assistant content so frontend can render code viewer
+    payload = {
+        "id": f"chatcmpl-show-{os.urandom(8).hex()}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": request.model,
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": json.dumps({
+                    "show_agent": {
+                        "name": agent_name,
+                        "files": {
+                            "main.py": code_text,
+                            "agent.yaml": yaml_text
+                        }
+                    }
+                }, ensure_ascii=False)
+            },
+            "finish_reason": "stop"
+        }],
+    }
+    return JSONResponse(content=payload)
 
 
 async def handle_agent_call(request: ChatCompletionRequest, agents: Dict[str, Agent]) -> Optional[JSONResponse]:

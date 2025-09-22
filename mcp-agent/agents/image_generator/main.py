@@ -1,58 +1,93 @@
-import os
-import requests
 from mcp_agent.agents.agent import Agent
+from typing import Dict, Optional
+import asyncio
 
-# This key should be securely managed, e.g., via environment variables
-# For demonstration, it's left as a placeholder.
-HF_TOKEN = os.environ.get("HF_TOKEN", "Bearer YOUR_HF_TOKEN")
+# Prefer per-agent runner and allow agent-specific model/provider via agent_config.
+# We keep previous fallback using get_provider for backward compatibility.
+try:
+    from mcp_agent.llm_mcp_app.agent_runner import AgentRunner
+    from mcp_agent.llm_mcp_app.providers import get_provider
+    from mcp_agent.llm_mcp_app.models import Message
+except ImportError:
+    # Support running from project root or examples
+    from llm_mcp_app.agent_runner import AgentRunner
+    from llm_mcp_app.providers import get_provider
+    from llm_mcp_app.models import Message
 
-def generate_image_from_prompt(prompt: str = "a cat in a hat") -> str:
+
+def run(task: str, agent_config: Optional[Dict] = None) -> Dict[str, str]:
     """
-    Generates an image using the Stable Diffusion model from Hugging Face.
-
-    Args:
-        prompt: The text prompt to generate the image from.
-
-    Returns:
-        A string containing the URL of the generated image or an error message.
+    Run the Image Generator agent. If agent_config is provided, use AgentRunner which
+    composes prompt_template and invokes the configured provider. Otherwise fall
+    back to the legacy behaviour using a hard-coded model via get_provider().
     """
-    api_url = "https://api-inference.huggingface.co/models/CompVis/stable-diffusion-v1-4"
-    headers = {"Authorization": HF_TOKEN}
-    
+    if agent_config:
+        runner = AgentRunner(agent_config)
+        try:
+            result = asyncio.run(runner.run(task))
+            if isinstance(result, dict):
+                return {"result": result.get("result", str(result))}
+            return {"result": str(result)}
+        except Exception:
+            return {"result": "<fallback message>"}
+
+    # Legacy fallback: call provider directly with model "flex" and prefer huggingface provider
+    model_name = "flex"
     try:
-        response = requests.post(api_url, headers=headers, json={"inputs": prompt}, timeout=60)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        
-        # Assuming the response is a binary image
-        # If the API returns a JSON with a URL, the logic needs to be adjusted.
-        # For example: image_url = response.json().get("generated_image_url")
-        # This example will save the image and return its path, which is more tool-like.
-        
-        # Let's assume the API returns a JSON with a URL as the original script suggested.
-        result = response.json()
-        if isinstance(result, dict) and "generated_image_url" in result:
-             return f"Image generated successfully: {result['generated_image_url']}"
-        elif isinstance(result, dict) and 'error' in result:
-             return f"API Error: {result['error']}"
+        # provider factory may accept a provider override; pass "huggingface" to prefer HF
+        provider = get_provider(model_name, provider_override="huggingface")
+    except TypeError:
+        # Some older versions accept only one argument
+        try:
+            provider = get_provider(model_name)
+        except Exception:
+            return {"result": "<fallback message>"}
+    except Exception:
+        return {"result": "<fallback message>"}
+
+    messages = [Message(role="user", content=task)]
+    try:
+        generated = asyncio.run(provider.chat(messages))
+        if isinstance(generated, dict):
+            text = generated.get("result") or generated.get("generated_text") or str(generated)
         else:
-             # Fallback for unexpected response format
-             return "Image generated, but URL not found in response."
-
-    except requests.exceptions.RequestException as e:
-        return f"Failed to generate image. Error: {e}"
-    except Exception as e:
-        return f"An unexpected error occurred: {e}"
+            text = str(generated)
+        return {"result": text}
+    except Exception:
+        return {"result": "<fallback message>"}
 
 
-def get_agent() -> Agent:
+def generate_image_from_prompt(prompt: str = "a cat in a hat", agent_config: Optional[Dict] = None) -> str:
+    """
+    Generates an image (or an image description/url) by delegating to run().
+    The agent follows the pattern used in codewriter: use AgentRunner when agent_config is provided,
+    otherwise fall back to get_provider() with model 'flex' and provider 'huggingface'.
+    """
+    result = run(prompt, agent_config)
+    if isinstance(result, dict):
+        return result.get("result", str(result))
+    return str(result)
+
+
+def get_agent(agent_config: Optional[Dict] = None) -> Agent:
     """
     Creates and returns the image_generator agent.
+    Accepts optional agent_config passed by the loader; this allows per-agent LLM + prompt configuration.
     """
+    def _generate_image(task: str) -> str:
+        return generate_image_from_prompt(task, agent_config)
+
+    instruction = (
+        "You are an agent that generates images from text prompts. "
+        "By default this agent uses model 'flex' with provider 'huggingface', but agent_config can override model/provider/prompt."
+    )
+
     return Agent(
         name="image_generator",
-        instruction="You are an agent that generates images from text prompts using a Hugging Face model.",
-        functions=[generate_image_from_prompt],
+        instruction=instruction,
+        functions=[_generate_image],
     )
+
 
 if __name__ == "__main__":
     # Example of how to get and use the agent
@@ -61,10 +96,6 @@ if __name__ == "__main__":
     print(f"Instruction: {image_agent.instruction}")
     
     # To test the function directly:
-    print("\nTesting the image generation function...")
-    # Make sure to set the HF_TOKEN environment variable for this to work
-    if "YOUR_HF_TOKEN" in HF_TOKEN:
-        print("Skipping test: Hugging Face token not set. Please set the HF_TOKEN environment variable.")
-    else:
-        result = generate_image_from_prompt("a futuristic city skyline at sunset")
-        print(result)
+    print("\nTesting the generate_image_from_prompt function...")
+    result = generate_image_from_prompt("a futuristic city skyline at sunset")
+    print(result)
