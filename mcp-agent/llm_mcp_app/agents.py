@@ -21,9 +21,9 @@ except ImportError as e:
     raise
 
 try:
-    from .config import logger, AGENTS_DIR
+    from .config import logger, AGENTS_DIR, DEFAULT_MODEL
 except ImportError:
-    from config import logger, AGENTS_DIR
+    from config import logger, AGENTS_DIR, DEFAULT_MODEL
 
 
 def load_all_agents(agents_dir: str = AGENTS_DIR) -> Dict[str, Agent]:
@@ -64,6 +64,33 @@ def load_all_agents(agents_dir: str = AGENTS_DIR) -> Dict[str, Agent]:
                             logger.warning(f"PyYAML not installed; skipping parsing of {agent_yaml_path}")
                     except Exception as e:
                         logger.warning(f"Failed to parse {agent_yaml_path}: {e}")
+
+                # Normalize common aliases and fill sensible defaults to remain backwards-compatible
+                try:
+                    if isinstance(agent_config, dict):
+                        # Legacy alias: 'prompt' -> 'prompt_template'
+                        if "prompt" in agent_config and "prompt_template" not in agent_config:
+                            agent_config["prompt_template"] = agent_config.pop("prompt")
+
+                        # Ensure model exists; fall back to configured DEFAULT_MODEL
+                        if not agent_config.get("model"):
+                            agent_config["model"] = DEFAULT_MODEL
+
+                        # Normalize timeout to int with safe default
+                        try:
+                            agent_config["timeout"] = int(agent_config.get("timeout", 30))
+                        except Exception:
+                            agent_config["timeout"] = 30
+
+                        # Ensure entrypoint default
+                        if not agent_config.get("entrypoint"):
+                            agent_config["entrypoint"] = "main.py"
+                except Exception as _e:
+                    # Non-fatal normalization error - keep original agent_config
+                    try:
+                        logger.debug(f"Error normalizing agent_config for {agent_name}: {_e}")
+                    except Exception:
+                        pass
 
                 if hasattr(agent_module, "get_agent"):
                     # Prefer calling get_agent with agent_config if supported; fall back to no-arg call

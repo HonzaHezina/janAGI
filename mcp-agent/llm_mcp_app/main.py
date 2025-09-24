@@ -164,6 +164,35 @@ async def plan_stream(request: Request):
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+@app.post("/v1/plan/preview")
+async def plan_preview(request: Request):
+    """
+    Return a human-friendly preview for a given plan JSON.
+    Expects body: { "plan": <plan_object_or_string> }
+    """
+    body = await request.json()
+    plan = body.get("plan")
+    if not plan:
+        return JSONResponse(status_code=400, content={"detail": "Missing 'plan' in body"})
+    try:
+        # Normalize plan object if it's a JSON string
+        if isinstance(plan, str):
+            try:
+                plan_obj = json.loads(plan)
+            except Exception:
+                # treat as textual plan (legacy) — return as-is in preview
+                return JSONResponse(content={"preview": str(plan)})
+        else:
+            plan_obj = plan
+        try:
+            from .planner import format_plan_preview
+        except ImportError:
+            from planner import format_plan_preview
+        preview = format_plan_preview(plan_obj)
+        return JSONResponse(content={"preview": preview})
+    except Exception as e:
+        logger.error(f"Error building plan preview: {e}")
+        return JSONResponse(status_code=500, content={"detail": "Failed to build plan preview"})
 
 
 @app.post("/v1/chat/completions")
