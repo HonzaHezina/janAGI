@@ -1,0 +1,11 @@
+name: onboarding_helper
+description: |
+  Onboarding helper to answer questions from internal documentation for new employees.
+model: gpt-3.5-turbo
+provider: openai
+prompt_template: |
+  Use the following document excerpts to answer the user's question concisely. Provide source paths in brackets.
+  {{task}}
+timeout: 30
+permissions: []
+entrypoint: main.py

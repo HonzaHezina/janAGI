@@ -49,3 +49,28 @@ Doporučené kroky a testy
 - Přidat příklad `agent.yaml` do `_examples` nebo do jednotlivých agent adresářů pro rychlou referenci.
 
 Konec.
+## Quick usage examples (ingest & query)
+
+- Ingest local docs (CLI):
+  - python -m mcp_agent.docs_ingest.ingest path/to/docs --out mcp-agent/docs_ingest/index.json
+  - See [`mcp-agent/docs_ingest/ingest.py`](mcp-agent/docs_ingest/ingest.py:1) for implementation.
+
+- Ingest via API (FastAPI):
+  - curl -s -X POST "http://localhost:8000/v1/docs/ingest" \
+    -H "Content-Type: application/json" \
+    -d '{"path":"mcp-agent/docs_sample","out":"mcp-agent/docs_ingest/index.json"}'
+
+- Query via API (FastAPI):
+  - curl -s -X POST "http://localhost:8000/v1/docs/query" \
+    -H "Content-Type: application/json" \
+    -d '{"query":"What should a new employee read first?", "index_path":"mcp-agent/docs_ingest/index.json", "top_k":5}'
+
+- Use agent programmatically (Python):
+  - from mcp_agent.agents.onboarding_helper.main import get_agent
+    agent = get_agent()
+    print(agent.functions[1]("mcp-agent/docs_sample"))   # add_documents(path)
+    print(agent.functions[0]("What is the onboarding contact?"))  # answer(query)
+
+Notes
+- Index file format: simple JSON produced by [`mcp-agent/docs_ingest/ingest.py`](mcp-agent/docs_ingest/ingest.py:1).
+- For production use protect endpoints and consider encrypting or restricting access to the index.

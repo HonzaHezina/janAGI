@@ -195,6 +195,49 @@ async def plan_preview(request: Request):
         return JSONResponse(status_code=500, content={"detail": "Failed to build plan preview"})
 
 
+@app.post("/v1/docs/ingest")
+async def docs_ingest(payload: dict = Body(...)):
+    """
+    Ingest documents from a local directory into a simple JSON index.
+    Payload: { "path": "<source_dir>", "out": "<optional output path>" }
+    """
+    source = payload.get("path")
+    out = payload.get("out", "mcp-agent/docs_ingest/index.json")
+    if not source:
+        return JSONResponse(status_code=400, content={"detail": "Missing 'path' in body"})
+    try:
+        try:
+            from .docs_ingest.ingest import ingest_directory
+        except ImportError:
+            from docs_ingest.ingest import ingest_directory
+        idx = ingest_directory(source, out_path=out)
+        return JSONResponse(content={"ingested": idx.get("meta", {}).get("total_documents", 0), "out": out})
+    except Exception as e:
+        logger.error(f"Error during docs ingest: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@app.post("/v1/docs/query")
+async def docs_query(payload: dict = Body(...)):
+    """
+    Query the JSON index for relevant document excerpts.
+    Payload: { "query": "<user query>", "index_path": "<optional index path>", "top_k": 5 }
+    """
+    query = payload.get("query")
+    index_path = payload.get("index_path", "mcp-agent/docs_ingest/index.json")
+    top_k = int(payload.get("top_k", 5))
+    if not query:
+        return JSONResponse(status_code=400, content={"detail": "Missing 'query' in body"})
+    try:
+        try:
+            from .docs_ingest.ingest import load_index, simple_retrieve
+        except ImportError:
+            from docs_ingest.ingest import load_index, simple_retrieve
+        index = load_index(index_path)
+        results = simple_retrieve(index, query, top_k=top_k)
+        return JSONResponse(content={"query": query, "results": results})
+    except Exception as e:
+        logger.error(f"Error during docs query: {e}")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     try:
