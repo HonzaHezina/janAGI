@@ -1,0 +1,54 @@
+{
+  "name": "20_analyst (skeleton)",
+  "nodes": [
+    {
+      "name": "Trigger (new lead/message)",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "analyst",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "Retrieve book (pgvector)",
+      "type": "n8n-nodes-langchain.vectorStorePGVector",
+      "parameters": {
+        "operation": "retrieve",
+        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.type\":\"expert_knowledge\"}"
+      }
+    },
+    {
+      "name": "Retrieve SOP (pgvector)",
+      "type": "n8n-nodes-langchain.vectorStorePGVector",
+      "parameters": {
+        "operation": "retrieve",
+        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.type\":\"sop\"}"
+      }
+    },
+    {
+      "name": "Retrieve history (pgvector)",
+      "type": "n8n-nodes-langchain.vectorStorePGVector",
+      "parameters": {
+        "operation": "retrieve",
+        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.type\":\"history\",\"metadata.lead_id\":\"={{$json.lead_id}}\"}"
+      }
+    },
+    {
+      "name": "LLM Draft",
+      "type": "n8n-nodes-langchain.chat",
+      "parameters": {
+        "model": "mistral",
+        "prompt": "-- TODO: prompt template"
+      }
+    },
+    {
+      "name": "Send to Telegram (approval)",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "text": "-- TODO"
+      }
+    }
+  ],
+  "connections": {}
+}
