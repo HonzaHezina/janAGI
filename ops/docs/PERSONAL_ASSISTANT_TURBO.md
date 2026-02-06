@@ -7,7 +7,7 @@ OpenClaw is the **Turbo**: it executes tasks that require *eyes + hands* (browse
 
 1. **Main assistant stays deterministic**
    - It decides *what* should happen.
-   - It records each decision as an event in your domain DB (`events`).
+   - It records each decision as an event in your domain DB (`rag.events`).
 
 2. **Turbo is opt-in (tool call)**
    - The LLM can request Turbo, but you keep a policy gate:
@@ -41,9 +41,8 @@ Instead:
 See: [ops/docs/ACTION_DRAFT_PROTOCOL.md](ops/docs/ACTION_DRAFT_PROTOCOL.md)
 
 ### What to store in DB
-- `events`: every action with `trace_id`
-- `tool_calls`: request/response metadata for each Turbo run
-- optional: `artifacts`: exported n8n workflow JSON, screenshots, etc.
+- `rag.events`: every action (messages, tool calls/results, approvals, errors)
+- `rag.artifacts`: request/response payloads for each Turbo run (OpenClaw)
 
 See also: [ops/docs/OPENCLAW_TURBO.md](ops/docs/OPENCLAW_TURBO.md)
 

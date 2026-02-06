@@ -1,44 +1,36 @@
 # DB_SCHEMA
 
+Current canonical schema: `rag.*` (see [ops/infra/postgres/init/020_rag_schema.sql](ops/infra/postgres/init/020_rag_schema.sql)).
+
 ## Extensions
 - `pgcrypto` (UUID)
 - `vector` (pgvector)
+- optional: `pg_trgm`, `unaccent`
 
-## Tabulky
+## rag.* (single source of truth)
 
-### leads
-- jeden řádek = jeden lead (post, komentář, DM thread)
-- dedupe: UNIQUE (client_id, source_type, source_ref)
+### rag.clients / rag.projects
+- stable keys you can reference from n8n (e.g. `client_key='janagi'`, `project_key='main'`)
 
-### messages
-- všechny zprávy (user/seller/system)
-- po INSERT se message embeduje a uloží do `janagi_documents` s `type=history`
+### rag.conversations
+- one row per thread (Telegram chat / channel thread / external thread)
+- dedupe: UNIQUE `(client_id, project_id, channel, thread_key)`
 
-### events
-- audit log + observability + billing
+### rag.runs
+- one row per orchestrated run (chat turn, tool execution, web subworkflow)
 
-### janagi_documents (vector store)
-Sloupce:
-- `id` UUID
-- `content` TEXT
-- `embedding` VECTOR(1024) (pro mistral-embed)
-- `metadata` JSONB (client_id, type, lead_id, message_id, role, ts, source...)
+### rag.events
+- append-only event log (messages, tool calls/results, errors, approvals)
+- ordering per conversation via `(conversation_id, event_no)`
 
-Metadata standard:
-```json
-{
-  "client_id": "uuid",
-  "type": "history|expert_knowledge|sop",
-  "lead_id": "uuid",
-  "message_id": "uuid",
-  "role": "user|seller|system",
-  "source": "telegram|book|sop",
-  "ts": "2026-02-02T12:34:56Z"
-}
-```
+### rag.artifacts
+- store big payloads (OpenClaw request/response bodies, diffs, logs)
 
-### analytics.*
-Výsledky MindsDB batch jobů:
-- `analytics.trends_daily`
-- `analytics.lead_scores`
-- další dle potřeby
+### rag.documents / rag.chunks
+- retrieval index; can point back to sources and carry metadata
+
+## Compatibility: janagi_documents
+
+We keep `janagi_documents` for easy integration with existing n8n/PGVector patterns.
+Treat it as a convenience vector store; the audit log is still `rag.events`.
+
