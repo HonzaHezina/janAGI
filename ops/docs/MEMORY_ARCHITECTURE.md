@@ -81,3 +81,31 @@ Stores the raw conversation history for debugging and short-term context.
 ### OpenClaw
 - **Env**: `N8N_BASE_URL=http://n8n:5678` (Internal Docker Network URL).
 - **Operation**: Calls n8n Webhooks to read/write memory.
+
+## Orchestration Logic (Main Chat Flow)
+
+The system uses a "Router" pattern to handle conversations:
+
+```mermaid
+graph TD
+    User[Telegram User] -->|Message| T[Trigger]
+    T -->|Insert| SQL1[(chat.messages)]
+    SQL1 --> SEARCH[Webhook: /memory-search]
+    SEARCH -->|Context| AI[AI Agent Router]
+    AI -->|Decision| A[Parser]
+    
+    A -->|Text Response| SQL2[(chat.messages)]
+    SQL2 --> REPLY[Telegram Reply]
+    
+    A -->|Extraction| MEM{New Info?}
+    MEM -->|Yes| UPSERT[Webhook: /memory-upsert]
+    UPSERT --> SQL_MEM[(rag.documents)]
+
+    A -->|Intent| SPEC{Start Spec?}
+    SPEC -->|Yes| WORK[Webhook: Spec Kit Flow]
+```
+
+### Flow Components
+1. **Audit Logging**: Every message is strictly logged to `chat.messages` before processing.
+2. **Context Injection**: RAG is performed *before* the LLM sees the prompt.
+3. **Action Parsing**: The LLM outputs special tokens like `[[MEMORY: ...]]` or `[[TRIGGER_SPEC: ...]]` which n8n parses to triger side-effects.

@@ -1,0 +1,184 @@
+{
+  "name": "JanAGI • Main • Text Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "janagi-chat-trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO chat.messages (platform, chat_id, role, content, metadata)\nVALUES ($1, $2, 'user', $3, $4::jsonb)\nRETURNING id;",
+        "additionalFields": {
+          "queryParams": "='telegram',{{$json.message.chat.id}},{{$json.message.text}},{{JSON.stringify($json.message)}}"
+        }
+      },
+      "name": "Log User Msg",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n:5678/webhook/memory-search",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{$node[\"Telegram Trigger\"].json.message.text}}"
+            },
+            {
+              "name": "namespace",
+              "value": "janagi"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Memory Retrieval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4-turbo-preview",
+        "prompt": "=You are OpenClaw (Jackie), an autonomous agent dispatcher.\n\nCONTEXT FROM MEMORY:\n{{ JSON.stringify($json.results) }}\n\nUSER MESSAGE:\n{{ $node[\"Telegram Trigger\"].json.message.text }}\n\nINSTRUCTIONS:\n1. Answer the user helpfuly.\n2. If the user provides a new specific instruction/fact, add a section at the end: \"[[MEMORY: <fact>]]\".\n3. If the user wants to start a project/spec, add \"[[TRIGGER_SPEC: <project_name>]]\".",
+        "options": {}
+      },
+      "name": "AI Agent (Router)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.text || $json.content || \"\";\n\nconst memoryMatch = text.match(/\\[\\[MEMORY: (.*?)\\]\\]/);\nconst specMatch = text.match(/\\[\\[TRIGGER_SPEC: (.*?)\\]\\]/);\n\nreturn [{\n  response_text: text,\n  memory_content: memoryMatch ? memoryMatch[1] : null,\n  spec_project: specMatch ? specMatch[1] : null,\n  chat_id: $node[\"Telegram Trigger\"].json.message.chat.id\n}];"
+      },
+      "name": "Parse Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO chat.messages (platform, chat_id, role, content)\nVALUES ('telegram', $1, 'assistant', $2);",
+        "additionalFields": {
+          "queryParams": "={{$json.chat_id}},{{$json.response_text}}"
+        }
+      },
+      "name": "Log Bot Msg",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.memory_content}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Has Memory?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n:5678/webhook/memory-upsert",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{$json.memory_content}}"
+            },
+            {
+              "name": "namespace",
+              "value": "janagi"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ JSON.stringify({ source: \"chat_extraction\", chat_id: $json.chat_id }) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Save Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chat_id}}",
+        "text": "={{$json.response_text}}",
+        "additionalFields": {}
+      },
+      "name": "Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [ [ { "node": "Log User Msg", "type": "main", "index": 0 } ] ] },
+    "Log User Msg": { "main": [ [ { "node": "Memory Retrieval", "type": "main", "index": 0 } ] ] },
+    "Memory Retrieval": { "main": [ [ { "node": "AI Agent (Router)", "type": "main", "index": 0 } ] ] },
+    "AI Agent (Router)": { "main": [ [ { "node": "Parse Actions", "type": "main", "index": 0 } ] ] },
+    "Parse Actions": { "main": [ [ { "node": "Log Bot Msg", "type": "main", "index": 0 } ] ] },
+    "Log Bot Msg": { "main": [ [ { "node": "Has Memory?", "type": "main", "index": 0 } ] ] },
+    "Has Memory?": {
+      "main": [
+        [ { "node": "Save Memory", "type": "main", "index": 0 }, { "node": "Telegram Reply", "type": "main", "index": 0 } ],
+        [ { "node": "Telegram Reply", "type": "main", "index": 0 } ]
+      ]
+    }
+  }
+}
