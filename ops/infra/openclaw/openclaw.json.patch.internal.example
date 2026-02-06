@@ -5,7 +5,7 @@
     "http": {
       "endpoints": {
         "responses": { "enabled": true },
-        "chatCompletions": { "enabled": false }
+        "chatCompletions": { "enabled": true }
       }
     }
   }

@@ -25,7 +25,7 @@
       "name": "(TODO) Extract JSON",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "jsCode": "// TODO: parse OpenClaw response and extract workflow JSON\n// For now, pass-through\nreturn [{ json: { workflow: $json } }];"
+        "jsCode": "// Extract Workflow JSON from OpenClaw response\n// Handles: raw JSON, Markdown code blocks, or extra text\n\nlet raw = '';\n\n// 1. Get the text output (field depends on OpenClaw version/endpoint)\nconst input = $json.input || $json.output || $json.message?.content || JSON.stringify($json);\n\n// 2. Strip Markdown code blocks if present\nconst markdownMatch = input.match(/```json\\s*([\\s\\S]*?)\\s*```/);\nif (markdownMatch) {\n  raw = markdownMatch[1];\n} else {\n  // 3. Fallback: Try to find first JSON object { ... }\n  const firstBrace = input.indexOf('{');\n  const lastBrace = input.lastIndexOf('}');\n  if (firstBrace >= 0 && lastBrace > firstBrace) {\n    raw = input.substring(firstBrace, lastBrace + 1);\n  } else {\n    raw = input; // Hope it's just the JSON\n  }\n}\n\n// 4. Parse\nlet workflow = {};\ntry {\n  workflow = JSON.parse(raw);\n} catch (e) {\n  throw new Error('Failed to parse workflow JSON from OpenClaw response: ' + e.message);\n}\n\n// 5. Basic Validation\nif (!workflow.nodes || !Array.isArray(workflow.nodes)) {\n  throw new Error('Invalid workflow JSON: missing \"nodes\" array.');\n}\n\nreturn [{ json: { workflow } }];"
       }
     },
     {
