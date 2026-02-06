@@ -23,6 +23,8 @@ All workflow JSON files are in `ops/n8n/`.
 | `WF_12_Turbo_OpenClaw_Run_RawBody.json` | OpenClaw call with `JSON.stringify` body |
 | `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via REST API (OpenClaw generates JSON → n8n applies) |
 | `WF_30_SpecKit_Full_Build_Parallel.json` | Full Spec Kit build with parallel Gemini + Copilot implementers, winner selection, PR |
+| `WF_40_Jackie_Telegram_Assistant.json` | Main Jackie AI assistant: Telegram → voice/text → history → AI agent → ACTION_DRAFT or reply |
+| `WF_41_Jackie_Action_Subflow.json` | Approved action executor: Telegram callback → parse ACTION_DRAFT → OpenClaw `/v1/responses` → artifact + reply |
 
 ## Reusable Snippets
 

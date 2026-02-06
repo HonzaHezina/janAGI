@@ -1,0 +1,466 @@
+{
+  "name": "janAGIsubflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -624,
+        -64
+      ],
+      "id": "324b0859-f33c-4813-9137-be820ad055fb",
+      "name": "Telegram Trigger",
+      "webhookId": "156361c6-e22f-442b-81dd-0f543ac32e4b",
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://openclaw:18789/v1/responses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "={{ $('Code in JavaScript').item.json.action.payload.model }}"
+            },
+            {
+              "name": "=input",
+              "value": "={{ String($('Code in JavaScript').item.json.action.payload.input ?? \"\") }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        560,
+        320
+      ],
+      "id": "b55b03f4-05e6-480f-96f0-574835276dad",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "oXGTUfvk6a176dto",
+          "name": "Bearer Auth account JH"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($json.draft_text || \"\").trim();\n\n// Najdi řádek s JSONem (typicky druhý řádek)\nconst lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\n// Najdi první řádek, který vypadá jako JSON objekt\nconst jsonLine = lines.find(l => l.startsWith(\"{\") && l.endsWith(\"}\"));\nif (!jsonLine) {\n  throw new Error(\"No JSON line found in draft_text. Expected [ACTION_DRAFT] + JSON.\");\n}\n\nlet action;\ntry {\n  action = JSON.parse(jsonLine);\n} catch (e) {\n  throw new Error(\"Failed to parse ACTION JSON: \" + e.message);\n}\n\nreturn [{\n  json: {\n    ...$json,\n    action\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        -48
+      ],
+      "id": "62520dbd-e059-4763-837c-34e54dd522aa",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH conv AS (\n  SELECT e.conversation_id\n  FROM rag.events e\n  WHERE e.event_type = 'tool_result'\n    AND e.name = 'action_draft_sent'\n    AND e.payload->>'telegram_message_id' = '{{ $json.message_id || $json.result?.message_id || $json.message?.message_id || \"\" }}'\n  ORDER BY e.ts DESC\n  LIMIT 1\n),\nparent AS (\n  SELECT e.run_id AS parent_run_id\n  FROM rag.events e\n  WHERE e.conversation_id = (SELECT conversation_id FROM conv)\n    AND e.run_id IS NOT NULL\n  ORDER BY e.ts DESC\n  LIMIT 1\n)\nSELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',                                      -- channel\n  (SELECT conversation_id::text FROM conv),         -- thread_key (použijeme conversation_id jako key)\n  'web_{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}'::text,  -- kind\n  ('SubRun for conversation ' || (SELECT conversation_id::text FROM conv))::text,\n  jsonb_build_object(\n    'parent_run_id', (SELECT parent_run_id FROM parent),\n    'tool', 'openclaw',\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}'\n  ),\n  '{}'::jsonb\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        176,
+        -32
+      ],
+      "id": "630b53bd-c3c9-44d2-a292-06116f71a528",
+      "name": "Start SubRun",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{$json.conversation_id}}'::uuid,\n  '{{$json.run_id}}'::uuid,\n  'n8n',\n  'subwf:web',\n  'tool_call',\n  'openclaw',\n  jsonb_build_object(\n    'type','web',\n    'target','openclaw',\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}',\n    'model', '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}',\n    'input', '{{ $json.action?.payload?.input || $json.input || \"\" }}'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        352,
+        128
+      ],
+      "id": "0287b17d-23c8-4a1c-bf16-1453ab8a0db4",
+      "name": "Log tool_call",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO rag.artifacts (\n  client_id, project_id, conversation_id, run_id,\n  kind, title, content_text, metadata\n)\nVALUES (\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $node[\"Start SubRun\"].json.conversation_id }}'::uuid,\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'openclaw_web_result',\n  ('OpenClaw web ' || '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}')::text,\n  '{{ ($json.output?.[0]?.content || []).map(c => c.text || \"\").join(\"\\n\") }}'::text,\n  jsonb_build_object(\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}',\n    'model', '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}',\n    'openclaw_response_id', '{{ $json.id || \"\" }}',\n    'openclaw_message_id', '{{ $json.output?.[0]?.id || \"\" }}'\n  )\n)\nRETURNING id AS artifact_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        768,
+        144
+      ],
+      "id": "436b1add-6e73-460e-9393-f09beb004c9e",
+      "name": "Insert Artifact",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $node[\"Start SubRun\"].json.conversation_id }}'::uuid,\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'openclaw',\n  '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}'::text,\n  'tool_result',\n  'openclaw',\n  jsonb_build_object(\n    'status','success',\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}',\n    'artifact_id', '{{ $json.artifact_id || \"\" }}'::text\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        928,
+        0
+      ],
+      "id": "70589c63-3d8b-4f59-8c5c-989f056179aa",
+      "name": "Log tool_result",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.finish_run(\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'success',\n  'Web action completed',\n  jsonb_build_object(\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}'\n  )\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1104,
+        144
+      ],
+      "id": "5d7f7252-2ac4-4bcb-95b2-14d282b86def",
+      "name": "Finish run",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body ?? $json; // podle toho jak n8n mapuje\n\nconst cq = b.callback_query;\nif (!cq) {\n  throw new Error(\"Expected callback_query update, but none found.\");\n}\n\nconst chatId = cq.message?.chat?.id;\nconst messageId = cq.message?.message_id;\nconst decision = cq.data; // \"approved\"\nconst draftText = cq.message?.text || cq.message?.caption || \"\";\n\nreturn [{\n  json: {\n    update_type: \"callback_query\",\n    decision,\n    chat_id: chatId,\n    message_id: messageId,\n    draft_text: draftText,\n\n    // volitelně pro logování/audit\n    telegram_user_id: cq.from?.id,\n    telegram_username: cq.from?.username,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        112
+      ],
+      "id": "5485bc5e-49ba-462d-9143-2cc2c7cbcdac",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH conv AS (\n  SELECT e.conversation_id\n  FROM rag.events e\n  WHERE e.event_type = 'tool_result'\n    AND e.name = 'action_draft_sent'\n    AND e.payload->>'telegram_message_id' = '{{ $json.message_id || $json.result?.message_id || $json.message?.message_id || \"\" }}'\n  ORDER BY e.ts DESC\n  LIMIT 1\n)\nSELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  (SELECT conversation_id FROM conv),\n  NULL,\n  'user',\n  '{{ $json.telegram_user_id || $json.from?.id || \"\" }}'::text,\n  'message',\n  'approval',\n  jsonb_build_object(\n    'role','user',\n    'text', CASE\n      WHEN '{{ $json.data || $json.decision || \"\" }}' = 'approved' THEN '[APPROVED]'\n      ELSE '[REJECTED]'\n    END,\n    'decision', '{{ $json.data || $json.decision || \"\" }}',\n    'chat_id', '{{ $json.chat_id || $json.chat?.id || $json.message?.chat?.id || \"\" }}',\n    'message_id', '{{ $json.message_id || $json.result?.message_id || $json.message?.message_id || \"\" }}',\n    'channel','telegram'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -48,
+        112
+      ],
+      "id": "a5673a62-ade7-4f94-ab09-f5dd9bcb6bc1",
+      "name": "Log approval",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{$node[\"Start SubRun\"].json[\"conversation_id\"]}}'::uuid,\n  '{{$node[\"Start SubRun\"].json[\"run_id\"]}}'::uuid,\n  'openclaw',\n  '{{ $json.model || \"openclaw:main\" }}'::text,\n  'error',\n  'openclaw_http_error',\n  jsonb_build_object(\n    'message', '{{$json.message || \"HTTP request failed\"}}',\n    'http_status', to_jsonb({{ ($json.status || 0) }}::int),\n    'response', to_jsonb('{{$json.response || \"\"}}'::text)\n  )\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        976,
+        432
+      ],
+      "id": "f898dba6-489d-49e0-8911-c39ac45563e8",
+      "name": "Log Error",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst status =\n  j.statusCode ?? j.status ?? j.httpCode ?? 0;\n\nconst message =\n  j.message ??\n  j.error?.message ??\n  j.cause?.message ??\n  'HTTP request failed';\n\nlet response = '';\ntry {\n  if (j.body !== undefined) response = typeof j.body === 'string' ? j.body : JSON.stringify(j.body);\n  else if (j.response !== undefined) response = typeof j.response === 'string' ? j.response : JSON.stringify(j.response);\n  else if (j.data !== undefined) response = typeof j.data === 'string' ? j.data : JSON.stringify(j.data);\n  else response = JSON.stringify(j);\n} catch (e) {\n  response = String(j.body ?? j.response ?? j.data ?? '');\n}\n\nreturn [{\n  status,\n  message,\n  response,\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        432
+      ],
+      "id": "728a24a6-4987-40f6-8208-9a2cfde55965",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "chatId": "=717801484",
+        "text": "={{ $('Code in JavaScript2').item.json.message }}",
+        "additionalFields": {}
+      },
+      "id": "6219a83d-d2ab-4e03-870c-bf654b1aef3b",
+      "name": "Error reply",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1184,
+        432
+      ],
+      "webhookId": "2c133a40-af48-4106-bc1a-be6047840a89",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "=717801484",
+        "text": "={{ \n  '<b>Nejnovější článek</b>\\n' +\n  '<b>Nadpis:</b> ' + ($(\"HTTP Request\").item.json.output?.[0]?.content?.[0]?.text || '—') + '\\n' +\n  '<b>URL:</b> ' + ($(\"HTTP Request\").item.json.output?.[0]?.url || '—') + '\\n\\n' +\n  ($(\"HTTP Request\").item.json.output?.[0]?.summary || '')\n}}\n",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "5d329252-c4c6-4dc9-9d46-bb47a3876a9d",
+      "name": "Reply",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1312,
+        144
+      ],
+      "webhookId": "2c133a40-af48-4106-bc1a-be6047840a89",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Insert Artifact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Log approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start SubRun": {
+      "main": [
+        [
+          {
+            "node": "Log tool_call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log tool_call": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Artifact": {
+      "main": [
+        [
+          {
+            "node": "Log tool_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log tool_result": {
+      "main": [
+        [
+          {
+            "node": "Finish run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finish run": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log approval": {
+      "main": [
+        [
+          {
+            "node": "Start SubRun",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error": {
+      "main": [
+        [
+          {
+            "node": "Error reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "756b1e81-0296-41fc-98b3-697777e8c81b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "id": "PKI8iFFjPDHF5Pds",
+  "tags": []
+}

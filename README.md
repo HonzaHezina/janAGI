@@ -105,6 +105,8 @@ Full SQL: [`ops/infra/postgres/init/020_rag_schema.sql`](ops/infra/postgres/init
 | `WF_10_Turbo_OpenClaw_Run.json` | Direct OpenClaw API call |
 | `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via API |
 | `WF_30_SpecKit_Full_Build_Parallel.json` | Full parallel build: Gemini + Copilot → winner → PR |
+| `WF_40_Jackie_Telegram_Assistant.json` | Main Jackie AI assistant (Telegram chat + voice) |
+| `WF_41_Jackie_Action_Subflow.json` | Approved action executor via OpenClaw |
 
 Import instructions: [`ops/docs/WORKFLOWS.md`](ops/docs/WORKFLOWS.md)
 

@@ -1,0 +1,790 @@
+{
+  "name": "janAGIasistent",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=<insert email here>"
+        },
+        "options": {
+          "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+          "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+          "fields": "=items(summary, start(dateTime))"
+        }
+      },
+      "id": "d876353f-b8a5-4469-8873-b65406c9e97f",
+      "name": "Google Calendar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        1104,
+        656
+      ],
+      "typeVersion": 1.1,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "readStatus": "unread",
+          "receivedAfter": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Received_After', ``, 'string') }}",
+          "receivedBefore": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Received_Before', ``, 'string') }}"
+        }
+      },
+      "id": "e6a8c97c-aa4e-45c5-867d-2731dd6f168b",
+      "name": "Get Email",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [
+        1232,
+        512
+      ],
+      "webhookId": "a4ae7b5d-7686-4bee-a753-848932860b4e",
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dfYt4eufdATehpW0",
+          "name": "Gmail account JH"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "00617fbd-2475-4805-a9dd-5b6b14055969",
+      "name": "Listen for incoming events",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -864,
+        -16
+      ],
+      "webhookId": "322dce18-f93e-4f86-b9b1-3305519b7834",
+      "typeVersion": 1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "a0bf9719-4272-46f6-ab3b-eda6f7b44fd8",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a229595b-284c-4a66-aeec-9b29d9d75080",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -384,
+        128
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $json?.message?.text || \"\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "169a1062-3fa3-4a18-b196-d5528c687482",
+      "name": "Voice or Text",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -608,
+        -16
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Listen for incoming events').item.json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "id": "7ebc4dd9-4c07-42eb-a7f8-34e8b2334153",
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -160,
+        -48
+      ],
+      "webhookId": "ef3f120e-c212-45ff-99b5-b6a5a82598d8",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "task": "MTY1MTc5NzMxMzA5NDc5MTQ5NzQ6MDow",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}",
+        "additionalFields": {}
+      },
+      "id": "99a81607-0f78-4abe-95f2-88cc3fdc0f6c",
+      "name": "Create a task in Google Tasks",
+      "type": "n8n-nodes-base.googleTasksTool",
+      "position": [
+        1552,
+        544
+      ],
+      "typeVersion": 1,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "task": "MTY1MTc5NzMxMzA5NDc5MTQ5NzQ6MDow",
+        "additionalFields": {}
+      },
+      "id": "d20e7ba1-ae64-41d8-b500-27db994a40b2",
+      "name": "Get many tasks in Google Tasks",
+      "type": "n8n-nodes-base.googleTasksTool",
+      "position": [
+        1680,
+        560
+      ],
+      "typeVersion": 1,
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', ``, 'string') }}",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', `Please format this nicely in html`, 'string') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "48ebcc89-779e-451a-84e5-cef37086912a",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [
+        1360,
+        512
+      ],
+      "webhookId": "a4ae7b5d-7686-4bee-a753-848932860b4e",
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dfYt4eufdATehpW0",
+          "name": "Gmail account JH"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-flash-latest",
+          "mode": "list",
+          "cachedResultName": "models/gemini-flash-latest"
+        },
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -48
+      ],
+      "id": "475da464-e3b0-4545-bb44-a5331a1a23c9",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ZBP8zcaHHlh4WAha",
+          "name": "Google Gemini(PaLM) Api account PN"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -864,
+        208
+      ],
+      "id": "b2e1d723-9ca8-4cc8-ac4e-6603492f882b",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"message\": {\n    \"text\": \"vyhledej mi na internetu novinky.cz a napiš mi co je tam za poslední aktuální článek\"\n  }\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -624,
+        208
+      ],
+      "id": "6b9aca23-22d6-48d3-a4a1-5158c89dddce",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "a0bf9719-4272-46f6-ab3b-eda6f7b44fd8",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "ACTION_DRAFT"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "fdf8d94e-9fac-43a6-8230-933f5657eeba",
+      "name": "If1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1456,
+        144
+      ],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "chatId": "717801484",
+        "text": "=🤖 Jackie navrhuje akci přes OpenClaw:\nShrnutí:\n{{ ($node[\"AI Jackie\"].json.output || \"\").split(\"\\n\").slice(0,1).join(\"\").slice(0, 200) }}...\n\n---PAYLOAD_JSON---\n{{\n(() => {\n  const out = ($node[\"AI Jackie\"].json.output || \"\").trim();\n\n  // 1) odřízni tag [ACTION_DRAFT] pokud je na začátku\n  let s = out.replace(/^\\[ACTION_DRAFT\\]\\s*/m, \"\").trim();\n\n  // 2) vyhoď případné ```json fences\n  s = s.replace(/```json\\s*/g, \"\").replace(/```/g, \"\").trim();\n\n  // 3) vezmi jen první JSON objekt z textu (nejjistější, když někdo přidá bordel)\n  const firstBrace = s.indexOf(\"{\");\n  if (firstBrace === -1) return \"\";\n\n  // jednoduchý brace-scan pro nalezení konce JSONu\n  let depth = 0;\n  let end = -1;\n  for (let i = firstBrace; i < s.length; i++) {\n    const ch = s[i];\n    if (ch === \"{\") depth++;\n    else if (ch === \"}\") {\n      depth--;\n      if (depth === 0) { end = i + 1; break; }\n    }\n  }\n  if (end === -1) return \"\";\n\n  const jsonStr = s.slice(firstBrace, end).trim();\n  const draft = JSON.parse(jsonStr);\n\n  // 4) přidej prefix do payload.input (už schváleno -> neptat se znovu)\n  //    DŮLEŽITÉ: FETCH-first. Web search jen pokud je dostupné (API key). Browser jen fallback.\n  const prefix =\n  \"This action is already approved by the user. Execute immediately.\\n\\n\" +\n  \"STRICT TOOLING RULES:\\n\" +\n  \"- Prefer WEB FETCH (download a URL and extract information) as the primary method.\\n\" +\n  \"- Do NOT use exec/shell, python, pip, Botasaurus, web-utils, scripts, or any scraping code.\\n\" +\n  \"- Do NOT access local filesystem paths like ~/.openclaw/...\\n\" +\n  \"- Do NOT use WEB SEARCH unless explicitly requested and available (API key present).\\n\" +\n  \"- Use BROWSER navigation (open/click/scroll/read) ONLY if fetch cannot retrieve the needed content.\\n\" +\n  \"- If you cannot access the page, explain what failed and stop.\\n\\n\";\n\n  if (draft?.payload?.input && !draft.payload.input.startsWith(prefix)) {\n    draft.payload.input = prefix + draft.payload.input;\n  }\n\n  return JSON.stringify(draft);\n})()\n}}\n---END_PAYLOAD_JSON---\n",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Schválit",
+                    "additionalFields": {
+                      "callback_data": "=approved"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "b5745ece-fda4-4565-a2a3-e39a7577b1b0",
+      "name": "Schvalni_akce",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1952,
+        16
+      ],
+      "webhookId": "2c133a40-af48-4106-bc1a-be6047840a89",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "=717801484",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "d4505e3e-74e1-4915-afd1-8cafca6b3f94",
+      "name": "Odpoved",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1968,
+        272
+      ],
+      "webhookId": "2c133a40-af48-4106-bc1a-be6047840a89",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.historyText }}",
+        "options": {
+          "systemMessage": "=# ROLE\nJsi Jackie, centrální inteligence a dispečer systému janAGI.\nTvým cílem je odpovídat uživateli a rozhodnout, zda je potřeba spustit akci (sub-workflow) přes nástroje.\n\nZde je historie konverzace (nejnovější dole):\n{{ $json.historyText }}\n\n# JEDINÝ ROZHODOVACÍ BOD\nVyhodnoť, zda pro splnění požadavku je nutná AKCE (web / cli).  \n- Pokud AKCE nutná je: vrať STRICT výstup A).\n- Pokud AKCE nutná není: vrať jen běžnou odpověď v češtině podle B).\n\n# KDY JE AKCE NUTNÁ\nAKCE je nutná, pokud:\n- potřebuješ něco získat z webu (aktuální data, stránka, článek, ověření),\n- potřebuješ spustit programovací/CLI workflow (spec-kit, scaffold, změny v repu, testy, lint, build, opravy),\n- nebo potřebuješ provést krok, který bez nástroje nejde.\n\nAKCE není nutná, pokud:\n- jde jen o vysvětlení, návrh, doporučení, plán, prompt, SQL, architekturu apod.\n- nebo už máš vše potřebné v historii a není potřeba nic ověřovat/spouštět.\n\n# WEB AKCE (openclaw) – úrovně\n1) FETCH: stáhni konkrétní URL a extrahuj informace (bez klikání) — preferuj vždy jako první.\n2) SEARCH: vyhledej na webu, když neznáš URL — použij jen pokud je dostupný search provider; jinak použij homepage + FETCH nebo požádej o URL.\n3) BROWSER: klikání / formuláře / login / dynamický obsah — jen když FETCH nestačí.\n\n# CLI / PROGRAMOVÁNÍ AKCE\nPoužij, když je potřeba realizovat změny end-to-end v repozitáři:\n- vygenerovat zadání/spec pomocí spec-kit,\n- scaffolding projektu, úpravy kódu, commity, branche,\n- spustit testy, lint, build,\n- porovnat výstup více CLI nástrojů a vybrat lepší (nebo zkombinovat),\n- opravit chyby iterativně.\n\n# VÝSTUPNÍ FORMÁTY (STRICT)\n\n## A) KDYŽ JE POTŘEBA AKCE\nVrať PŘESNĚ 2 řádky a nic víc:\n\nŘádek 1: [ACTION_DRAFT]\nŘádek 2: jeden řádek čistého JSON (bez markdownu, bez ```)\n\nPovolené JSON typy:\n\n1) WEB (openclaw):\n{\"type\":\"web\",\"target\":\"openclaw\",\"payload\":{\"model\":\"openclaw:main\",\"mode\":\"fetch|search|browser\",\"input\":\"<EN prompt>\"}}\n\n2) CLI (programování / spec-kit / repo):\n{\"type\":\"cli\",\"target\":\"spec-kit\",\"payload\":{\"repo\":\"<repo_url_or_path>\",\"branch\":\"<branch_name>\",\"mode\":\"spec|implement|test|repair|compare\",\"input\":\"<EN prompt>\",\"tools\":[\"<tool1>\",\"<tool2>\"]}}\n\nPOVINNÉ:\n- JSON musí být na jednom řádku (single-line).\n- Nepoužívej žádné ``` ani \"```json\".\n- Žádný další text před ani za tím.\n- payload.input vždy piš anglicky, v imperativu, s jasnými kroky a očekávaným výstupem.\n\n## B) KDYŽ AKCE NENÍ POTŘEBA\nVrať jen normální odpověď v češtině.\n- Nesmíš použít tag [ACTION_DRAFT]\n- Nesmíš použít ani escapovanou variantu \\[ACTION_DRAFT\\]\n- Nesmíš použít slovo ACTION_DRAFT\n\n# OPENCLAW PROMPT (payload.input) – EN šablony\n- fetch: \"Fetch <URL> and extract ... Return <fields> ... Return only ...\"\n- search: \"Search the web for ... Return top N results with titles + absolute URLs ...\"\n- browser: \"Go to <URL>. Click <...>. Wait <...>. Extract <...>.\"\n\n# SPEC-KIT / CLI PROMPT (payload.input) – EN šablony\n- spec: \"Use GitHub spec-kit. Produce a clear spec with acceptance criteria, scope, out-of-scope, and test plan. Ask minimal questions only if blocking.\"\n- implement: \"Implement the spec end-to-end in the repository. Add tests. Ensure lint/build passes. Create a branch and commit logically.\"\n- test: \"Run tests/lint/build. Summarize failures and propose fixes.\"\n- repair: \"Fix the failing tests/build issues iteratively until passing.\"\n- compare: \"Run tool A and tool B, compare outputs, pick the better result, and explain why.\"\n\n# KOMUNIKACE (když AKCE není potřeba)\nOdpovídej česky, stručně, profesionálně, lehce vtipně.  \nKdyž navrhuješ postup, dej kroky. Když něco není jasné, navrhni rozumný default (nevyptávej se zbytečně).\n\n#Historie zpráv s uživatele\n{{ $json.historyText }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1104,
+        144
+      ],
+      "id": "d1d889cb-1f64-4d49-acdd-850fdc207eda",
+      "name": "AI Jackie"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-last"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        928,
+        384
+      ],
+      "id": "7b3f1251-5a83-419d-93c9-2a516d3b34dd",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\n// nejstarší nahoře\nrows.reverse();\n\n// jednoduchý formát\nconst historyText = rows\n  .map(r => `[${r.role}] ${r.content}`)\n  .join('\\n');\n\nreturn [{ json: { historyText } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        80
+      ],
+      "id": "9e909fb3-9549-4995-98e3-d19e2d3e1d70",
+      "name": "Format history"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  :client_id::uuid,\n  :project_id::uuid,\n  :conversation_id::uuid,\n  :run_id::uuid,\n  'n8n',\n  'ai_jackie',\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role','assistant',\n    'text', :text,\n    'channel','telegram'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1696,
+        272
+      ],
+      "id": "56095b40-76d2-4b1b-b996-38e5813c168d",
+      "name": "Log assistant message",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  NULLIF('{{$node[\"Start run\"].json[\"conversation_id\"] || \"\"}}','')::uuid,\n  NULLIF('{{$node[\"Start run\"].json[\"run_id\"] || \"\"}}','')::uuid,\n  'n8n',\n  'ai_jackie',\n  'tool_call',\n  'action_draft',\n  jsonb_build_object(\n    'type','action_draft',\n    'raw', to_jsonb('{{$json.output ? $json.output.replace(/'/g, \"''\") : \"\"}}'::text)\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1680,
+        16
+      ],
+      "id": "9f043522-c340-4dcd-94f8-c74cf899ba62",
+      "name": "Log action draft",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{$node[\"Start run\"].json[\"conversation_id\"]}}'::uuid,\n  '{{$node[\"Start run\"].json[\"run_id\"]}}'::uuid,\n  'n8n',\n  'telegram',\n  'tool_result',\n  'action_draft_sent',\n  jsonb_build_object(\n    'status','sent',\n    'telegram_message_id', '{{$json.result.message_id}}'::text,\n    'channel','telegram'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2224,
+        16
+      ],
+      "id": "20147c7d-da37-48c5-95d1-895e236f5435",
+      "name": "Log action draft sent",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{$json.message.chat.id}}'::text,\n  'chat',\n  ('Telegram chat ' || '{{$json.message.chat.id}}')::text,\n  '{}'::jsonb,\n  '{}'::jsonb\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        144
+      ],
+      "id": "ca11d820-b41f-493a-8918-bd1634e64049",
+      "name": "Start run",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{$json.conversation_id}}'::uuid,\n  '{{$json.run_id}}'::uuid,\n  'user',\n  '{{$node[\"Listen for incoming events\"].json.message.from.id}}'::text,\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role','user',\n    'text', to_jsonb('{{$node[\"Listen for incoming events\"].json.message.text}}'::text),\n    'channel','telegram',\n    'chat_id', to_jsonb('{{$node[\"Listen for incoming events\"].json.message.chat.id}}'::text)\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        64
+      ],
+      "id": "28320094-7f93-4808-a99a-d52fdf8a886d",
+      "name": "Log user message",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT role, content, ts\nFROM (\n  SELECT\n    COALESCE(payload->>'role', actor_type) AS role,\n    COALESCE(\n      payload->>'text',\n      payload->>'content',\n      payload->>'message',\n      payload->>'raw'\n    ) AS content,\n    ts\n  FROM rag.events\n  WHERE conversation_id = '{{ $node[\"Start run\"].json.conversation_id }}'::uuid\n    AND event_type = 'message'\n    AND COALESCE(payload->>'role', actor_type) IN ('user','assistant')\n    AND COALESCE(payload->>'text', payload->>'content', payload->>'message', payload->>'raw') IS NOT NULL\n  ORDER BY ts DESC\n  LIMIT 20\n) t\nORDER BY ts ASC;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        592,
+        176
+      ],
+      "id": "4f0ddfec-96b0-4380-8909-cc4f29bd5cd5",
+      "name": "Load history",
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Calendar": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Get Email": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Listen for incoming events": {
+      "main": [
+        [
+          {
+            "node": "Voice or Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get Voice File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Start run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice or Text": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Voice File": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a task in Google Tasks": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Get many tasks in Google Tasks": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Send Email": {
+      "ai_tool": [
+        []
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Start run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Log action draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log assistant message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schvalni_akce": {
+      "main": [
+        [
+          {
+            "node": "Log action draft sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Jackie": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Jackie",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format history": {
+      "main": [
+        [
+          {
+            "node": "AI Jackie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log action draft": {
+      "main": [
+        [
+          {
+            "node": "Schvalni_akce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log assistant message": {
+      "main": [
+        [
+          {
+            "node": "Odpoved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start run": {
+      "main": [
+        [
+          {
+            "node": "Log user message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log user message": {
+      "main": [
+        [
+          {
+            "node": "Load history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load history": {
+      "main": [
+        [
+          {
+            "node": "Format history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "c8683d63-d7b5-4609-917f-d0f638233114",
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "id": "pSCltTFtbL2O0NFG",
+  "tags": []
+}
