@@ -21,7 +21,7 @@ All workflow JSON files are in `ops/n8n/`.
 | `WF_10_Turbo_OpenClaw_Run.json` | Direct OpenClaw `/v1/responses` call |
 | `WF_11_Turbo_OpenClaw_UI_Operator.json` | OpenClaw PLAN/APPLY/VERIFY pattern |
 | `WF_12_Turbo_OpenClaw_Run_RawBody.json` | OpenClaw call with `JSON.stringify` body |
-| `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via REST API |
+| `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via REST API (OpenClaw generates JSON → n8n applies) |
 
 ## Reusable Snippets
 
@@ -45,3 +45,4 @@ All workflow JSON files are in `ops/n8n/`.
 - [ACTION_DRAFT_PROTOCOL.md](ACTION_DRAFT_PROTOCOL.md) — Approval gate pattern
 - [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) — OpenClaw integration
 - [SPECKIT_OPENCLAW_CLI.md](SPECKIT_OPENCLAW_CLI.md) — Spec-Kit autopilot
+- [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md) — OpenClaw generates n8n workflows via API

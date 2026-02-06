@@ -13,7 +13,7 @@ Single database hosting all schemas:
 Extensions: `vector`, `pgcrypto`, `pg_trgm`, `unaccent`.
 
 ### n8n (Orchestration Layer)
-Master workflow engine. Three main flows:
+Master workflow engine. Four main flows:
 
 1. **Chat Orchestrator** (`main_chat_orchestrator.json`)
    - Telegram Trigger → `rag.start_run()` → `rag.log_event()` → RAG Search → AI Agent → Parse Actions → Reply
@@ -28,11 +28,21 @@ Master workflow engine. Three main flows:
    - REFINE phase: Gather requirements conversationally → produce `locked.json`
    - EXECUTE phase: Bootstrap repo → run AI implementers → evaluate → create PR
 
+4. **Workflow Builder** (via n8n REST API)
+   - OpenClaw generates n8n workflow JSON on demand
+   - n8n validates + applies it via `POST /api/v1/workflows`
+   - Allows OpenClaw to "click workflows" programmatically (API-first)
+   - See [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md)
+
 ### OpenClaw / Jackie (Agent Layer)
 AI reasoning engine with optional browser/CLI tools:
 - Receives prompts from n8n with injected RAG context
 - Produces structured responses with action tokens
 - Can operate autonomously (Spec-Kit) or with human approval (Action Draft)
+- **Handles all operational work** the human would otherwise do manually:
+  repo creation, Spec Kit bootstrap, branch management, CLI invocation, PR creation
+- **Workflow Builder**: generates n8n workflow JSON and creates workflows via n8n API
+- Connects to n8n via `http://n8n:5678` (internal Docker DNS)
 
 ### Telegram (Interface Layer)
 Primary user interface:
@@ -78,6 +88,7 @@ All services communicate via internal Docker DNS:
 | n8n | Postgres | `postgresql:5432` |
 | n8n | OpenClaw | `http://openclaw:18789` |
 | OpenClaw | n8n | `http://n8n:5678` |
+| OpenClaw | n8n API | `http://n8n:5678/api/v1/` |
 
 **Important**: Never use `localhost` between containers. Coolify manages the network.
 

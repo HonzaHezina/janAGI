@@ -11,9 +11,10 @@ and knowledge system — all accessible via **Telegram**.
 ## What It Does
 
 1. **Telegram Chat with Memory** — Jackie remembers conversations, facts, and context using vector search (RAG).
-2. **Spec-Kit Dispatcher** — Jackie can scaffold new software projects: gather requirements, lock specs, delegate implementation to AI coders (Gemini/Copilot), evaluate results, and create PRs.
-3. **Knowledge Base** — Ingest documents, URLs, and notes into a searchable vector store.
-4. **Action Draft Protocol** — For risky operations, Jackie proposes an action draft and waits for human approval via Telegram before executing.
+2. **Spec-Kit Dispatcher** — Jackie can scaffold new software projects: gather requirements, lock specs, delegate implementation to AI coders (Gemini/Copilot), evaluate results, and create PRs. OpenClaw does everything you'd do manually — repo, branches, Spec Kit bootstrap, CLI invocation, PR.
+3. **n8n Workflow Builder** — Tell OpenClaw what workflow you need and it generates the n8n JSON, then n8n creates it via its REST API. No manual clicking.
+4. **Knowledge Base** — Ingest documents, URLs, and notes into a searchable vector store.
+5. **Action Draft Protocol** — For risky operations, Jackie proposes an action draft and waits for human approval via Telegram before executing.
 
 ---
 
