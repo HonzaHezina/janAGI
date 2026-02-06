@@ -15,7 +15,7 @@ PARAMETERS = {
   "user": "mindsdb_ro",
   "password": "*****",
   "database": "janagi",
-  "schema": "public"
+  "schema": "rag"
 };
 ```
 
@@ -24,7 +24,8 @@ PARAMETERS = {
 -- pseudo
 CREATE JOB trends_daily
 AS (
-  -- compute topics/keywords, write into analytics.trends_daily
+  -- compute topics/keywords from rag.events / rag.documents, write into analytics.trends_daily
 )
 EVERY 1 day;
 ```
+

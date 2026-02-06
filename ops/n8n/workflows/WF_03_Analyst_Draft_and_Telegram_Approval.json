@@ -2,7 +2,7 @@
   "name": "WF_03_Analyst_Draft_and_Telegram_Approval (skeleton)",
   "nodes": [
     {
-      "name": "Trigger (new lead/message)",
+      "name": "Trigger (new message)",
       "type": "n8n-nodes-base.webhook",
       "parameters": {
         "path": "analyst",
@@ -10,11 +10,11 @@
       }
     },
     {
-      "name": "Retrieve book (pgvector)",
+      "name": "Retrieve knowledge (pgvector)",
       "type": "n8n-nodes-langchain.vectorStorePGVector",
       "parameters": {
         "operation": "retrieve",
-        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.type\":\"expert_knowledge\"}"
+        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.project_id\":\"={{$json.project_id}}\",\"metadata.type\":\"expert_knowledge\"}"
       }
     },
     {
@@ -22,7 +22,7 @@
       "type": "n8n-nodes-langchain.vectorStorePGVector",
       "parameters": {
         "operation": "retrieve",
-        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.type\":\"sop\"}"
+        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.project_id\":\"={{$json.project_id}}\",\"metadata.type\":\"sop\"}"
       }
     },
     {
@@ -30,7 +30,7 @@
       "type": "n8n-nodes-langchain.vectorStorePGVector",
       "parameters": {
         "operation": "retrieve",
-        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.type\":\"history\",\"metadata.lead_id\":\"={{$json.lead_id}}\"}"
+        "filter": "{\"metadata.client_id\":\"={{$json.client_id}}\",\"metadata.project_id\":\"={{$json.project_id}}\",\"metadata.type\":\"history\",\"metadata.conversation_id\":\"={{$json.conversation_id}}\"}"
       }
     },
     {

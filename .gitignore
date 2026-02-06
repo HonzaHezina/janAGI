@@ -8,9 +8,10 @@ node_modules/
 
 # Env
 .env
-infra/.env
+ops/infra/.env
 
 # n8n
+ops/infra/n8n/.n8n/
 n8n/.n8n/
 n8n_data/
 

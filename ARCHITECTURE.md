@@ -6,15 +6,14 @@ Postavit multi-tenant “ops platformu” pro sběr leadů a asistovanou komunik
 ## Komponenty
 
 ### Postgres + pgvector
-- `leads`, `messages`, `events` = operativní data
-- `janagi_documents` = vektory (kniha/SOP/historie)
-- `analytics.*` = výsledky MindsDB
+- `rag.*` = operativní data + audit log + RAG index
+- `analytics.*` = výsledky MindsDB (batch scoring, trendy)
 
 ### n8n (Master orchestrator)
 3 hlavní workflow:
-1) **Hunter**: sběr leadů → `leads (NEW)`
-2) **Analyst**: retrieval (book+sop+history) → draft → Telegram approval
-3) **Executor**: schválení → odeslání (manual/API) + log do `events`
+1) **Hunter**: sběr kandidátů → `rag.documents` (+ embed do `rag.chunks`)
+2) **Analyst**: retrieval (knowledge+sop+history) → draft → Telegram approval
+3) **Executor**: schválení → odeslání (manual/API) + log do `rag.events`
 
 ### Clawd/Moltbot worker (oči a ruce)
 HTTP worker, který:
@@ -32,28 +31,29 @@ HTTP worker, který:
 ## Datové toky
 
 ### Lead pipeline
-1) Hunter najde kandidáta → INSERT do `leads` (dedupe pomocí UNIQUE)
+1) Hunter najde kandidáta → UPSERT do `rag.sources`/`rag.documents` (dedupe pomocí unique indexů)
 2) Analyst:
-   - načte lead + poslední zprávy
-   - retrieval nad `janagi_documents` (3 filtry)
+  - načte thread/conversation + poslední zprávy (`rag.events`)
+  - retrieval nad `rag.chunks` (knowledge/sop/history přes metadata)
    - vytvoří draft odpovědi + vysvětlení
    - pošle do Telegramu (Approve/Edit/Ignore)
 3) Executor:
-   - uloží finální text + status
-   - log `events`
+  - uloží finální text + status jako event
+  - log `rag.events`
 
 ### RAG retrieval pravidla
-- book: `type=expert_knowledge AND client_id`
-- sop:  `type=sop AND client_id`
-- history: `type=history AND client_id AND lead_id`
+- knowledge: `metadata.type=expert_knowledge AND client/project`
+- sop: `metadata.type=sop AND client/project`
+- history: `metadata.type=history AND conversation_id`
 
 ## Observability
-- každá akce zapisuje do `events`:
+-- každá akce zapisuje do `rag.events`:
   - `type` (hunter.found, analyst.draft, telegram.approved, executor.sent, ...)
   - `payload` (json)
-  - `trace_id`
+  - `run_id` + `conversation_id`
 
 ## Multi-tenant
 - Vždy mít `client_id`
-- Vektorové dokumenty musí mít `metadata.client_id`
+- Vektorové chunk-y musí mít `client_id` a `project_id`
 - Všechny query musí filtrovat na `client_id`
+

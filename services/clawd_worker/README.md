@@ -1,3 +1,4 @@
+````markdown
 # clawd_worker
 
 Minimal FastAPI worker (stub) pro “oči a ruce” (scrape / screenshot / extraction).
@@ -37,3 +38,5 @@ Stub pro budoucí použití (Browserless / Playwright / OpenClaw).
 
 ## Poznámka
 Tenhle worker je záměrně “dumb” – logika patří do n8n.
+
+````

@@ -9,7 +9,7 @@ Tahle část ekosystému **janAGI** řeší “operativu” (sběr leadů, RAG o
 
 ## Co v repu je
 
-- **Postgres + pgvector**: jednotný zdroj pravdy pro leady, zprávy, události + vektorové dokumenty (kniha / SOP / historie).
+- **Postgres + pgvector**: jednotný zdroj pravdy v `rag.*` (event log + runs + artifacts + RAG index).
 - **n8n**: Master orchestrátor (Hunter → Analyst → Telegram approval → Executor).
 - **MindsDB**: analytický koprocesor (denní/týdenní batch modely, trendy, reporting).
 - **Clawd/Moltbot worker**: “oči a ruce” pro webové zdroje (scrape/screenshot/klikání) — volané z n8n přes HTTP.
@@ -33,7 +33,7 @@ flowchart LR
 
   subgraph Data[Data]
     PG[(Postgres + pgvector)]
-    VEC[janagi_documents (vectors)]
+    RAG[(rag.* schema)]
     ANA[analytics.*]
   end
 
@@ -44,8 +44,7 @@ flowchart LR
   A1 -->|Hunter| N8N
   A2 -->|Hunter| N8N
   N8N -->|scrape/screenshot| CL
-  N8N -->|write| PG
-  PG --- VEC
+  N8N -->|write| RAG
   N8N -->|notify/approve| TG
 
   PG -->|read| MDB
@@ -55,15 +54,12 @@ flowchart LR
 
 ---
 
-## RAG paměť (3 typy v jedné tabulce)
+## RAG paměť
 
-Všechny “dokumenty” (kniha / SOP / historie chatu) jsou v **jedné** tabulce `janagi_documents`:
+- Audit log a paměť konverzací: `rag.events`
+- Retrieval index: `rag.documents` + `rag.chunks` (embeddingy)
 
-- `type=expert_knowledge` (statická znalost)
-- `type=sop` (procedurální pravidla)
-- `type=history` (dynamická paměť — každá zpráva)
-
-Každý záznam má `metadata.client_id` pro multi‑tenant filtraci.
+Kanoničtější popis DB je v [DB_SCHEMA.md](DB_SCHEMA.md) a init skripty jsou v `ops/infra/postgres/init/`.
 
 ---
 
@@ -144,7 +140,8 @@ Dokumentace + šablony:
 │   │   └── postgres/
 │   │       └── init/
 │   │           ├── 001_extensions.sql
-│   │           └── 010_tables.sql
+│   │           ├── 020_rag_schema.sql
+│   │           └── 030_analytics.sql
 │   └── n8n/
 │       └── workflows/
 │           ├── WF_01_Ingest_Message.json
@@ -177,3 +174,4 @@ Dokumentace + šablony:
 - [ ] Skutečný Hunter skill pro 1 zdroj (doporučeně Reddit/RSS)
 - [ ] MindsDB: první daily job → `analytics.trends_daily`
 - [ ] Dashboard (bolt.diy / UI) pro “lead inbox” + approvals
+

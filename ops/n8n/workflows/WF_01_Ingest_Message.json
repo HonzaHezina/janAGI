@@ -14,7 +14,7 @@
       "type": "n8n-nodes-base.postgres",
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- TODO: insert into messages"
+        "query": "-- TODO (rag.*): call rag.start_run_for_thread + rag.log_event('message','user')"
       }
     },
     {
@@ -34,7 +34,7 @@
       "type": "n8n-nodes-base.postgres",
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- TODO: insert into janagi_documents"
+        "query": "-- TODO (rag.*): insert into rag.documents + rag.chunks (embedding)"
       }
     }
   ],

@@ -25,11 +25,11 @@
       }
     },
     {
-      "name": "Upsert leads (Postgres)",
+      "name": "Upsert sources+documents (Postgres)",
       "type": "n8n-nodes-base.postgres",
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- TODO: insert into leads on conflict do nothing"
+        "query": "-- TODO (rag.*): upsert into rag.sources + rag.documents"
       }
     },
     {
@@ -37,9 +37,10 @@
       "type": "n8n-nodes-base.postgres",
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- TODO: insert into events"
+        "query": "-- TODO (rag.*): rag.log_event('hunter.found', ...)"
       }
     }
   ],
   "connections": {}
 }
+
