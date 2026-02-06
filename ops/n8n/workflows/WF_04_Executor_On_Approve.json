@@ -1,0 +1,21 @@
+{
+  "name": "WF_04_Executor_On_Approve (skeleton)",
+  "nodes": [
+    {
+      "name": "Telegram Callback (Approve)",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "parameters": {
+        "updates": ["callback_query"]
+      }
+    },
+    {
+      "name": "Send approved reply (manual/API)",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "operation": "sendMessage",
+        "text": "-- TODO: send final message or store for manual copy/paste"
+      }
+    }
+  ],
+  "connections": {}
+}

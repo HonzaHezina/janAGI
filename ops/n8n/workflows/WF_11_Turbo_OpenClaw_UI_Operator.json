@@ -1,0 +1,43 @@
+{
+  "name": "WF_11_Turbo_OpenClaw_UI_Operator (skeleton)",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "turbo/openclaw/ui-operator",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "OpenClaw PLAN (responses)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/responses",
+        "method": "POST",
+        "jsonParameters": true,
+        "sendBody": true,
+        "headerParametersJson": "={{JSON.stringify({ Authorization: 'Bearer ' + $env.OPENCLAW_GATEWAY_TOKEN })}}",
+        "body": "={{JSON.stringify({ model: 'openclaw:main', user: 'n8n:ui-operator', input: $json.input || 'PLAN: ' + JSON.stringify($json) })}}"
+      }
+    },
+    {
+      "name": "(TODO) Approval Gate",
+      "type": "n8n-nodes-base.noOp",
+      "parameters": {}
+    },
+    {
+      "name": "OpenClaw APPLY+VERIFY (responses)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/responses",
+        "method": "POST",
+        "jsonParameters": true,
+        "sendBody": true,
+        "headerParametersJson": "={{JSON.stringify({ Authorization: 'Bearer ' + $env.OPENCLAW_GATEWAY_TOKEN })}}",
+        "body": "={{JSON.stringify({ model: 'openclaw:main', user: 'n8n:ui-operator', input: $json.apply_input || 'APPLY+VERIFY: ' + JSON.stringify($json) })}}"
+      }
+    }
+  ],
+  "connections": {}
+}

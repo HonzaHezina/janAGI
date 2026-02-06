@@ -1,0 +1,45 @@
+{
+  "name": "WF_02_Hunter_Run (skeleton)",
+  "nodes": [
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "triggerTimes": [
+          {
+            "mode": "everyX",
+            "value": 15,
+            "unit": "minutes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Call Clawd Worker (hunt)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://clawd_worker:8090/tasks/hunt",
+        "method": "POST",
+        "jsonParameters": true,
+        "sendBody": true
+      }
+    },
+    {
+      "name": "Upsert leads (Postgres)",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- TODO: insert into leads on conflict do nothing"
+      }
+    },
+    {
+      "name": "Emit event",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- TODO: insert into events"
+      }
+    }
+  ],
+  "connections": {}
+}

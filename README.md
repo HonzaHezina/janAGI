@@ -72,7 +72,7 @@ Každý záznam má `metadata.client_id` pro multi‑tenant filtraci.
 ### 1) Připrav env
 Zkopíruj:
 ```bash
-cp infra/.env.example infra/.env
+cp ops/infra/.env.example ops/infra/.env
 ```
 
 Vyplň minimálně:
@@ -82,7 +82,7 @@ Vyplň minimálně:
 
 ### 2) Spusť stack
 ```bash
-cd infra
+cd ops/infra
 docker compose up -d
 ```
 
@@ -92,7 +92,22 @@ docker compose up -d
 - Postgres: localhost:5432
 
 ### 3) Import workflow šablon
-V `n8n/workflows/` jsou exporty (nebo skeletony). Importuj je do n8n přes UI.
+V `ops/n8n/workflows/` jsou exporty (nebo skeletony). Importuj je do n8n přes UI.
+
+---
+
+## OpenClaw Turbo (n8n ↔ OpenClaw)
+
+OpenClaw je volitelný “Turbo” pro úlohy, které vyžadují *oči a ruce* (web/UI, multi-step ops).
+
+- V Docker/Coolify **nepoužívej** z n8n `http://127.0.0.1:18789`.
+- Použij interní DNS na stejné síti: `OPENCLAW_BASE_URL=http://openclaw:18789`.
+
+Dokumentace + šablony:
+- `ops/docs/OPENCLAW_TURBO.md`
+- `ops/docs/ACTION_DRAFT_PROTOCOL.md`
+- `ops/docs/WORKFLOWS.md`
+- `ops/docs/SPECKIT_OPENCLAW_CLI.md`
 
 ---
 
@@ -112,33 +127,39 @@ V `n8n/workflows/` jsou exporty (nebo skeletony). Importuj je do n8n přes UI.
 
 ```
 .
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── DB_SCHEMA.md
-│   ├── RAG.md
-│   ├── RUNBOOK_COOLIFY.md
-│   └── adr/
-│       └── 0001-hybrid-ops-analytics.md
-├── infra/
-│   ├── docker-compose.yml
-│   ├── .env.example
-│   └── postgres/
-│       └── init/
-│           ├── 001_extensions.sql
-│           └── 010_tables.sql
-├── n8n/
-│   └── workflows/
-│       ├── 00_ingest_message.json
-│       ├── 10_hunter.json
-│       ├── 20_analyst.json
-│       └── 90_mindsdb_daily_jobs.md
-├── services/
-│   └── clawd_worker/
-│       ├── README.md
-│       ├── Dockerfile
-│       └── app/
-│           └── main.py
-└── CONTRIBUTING.md
+├── ops/
+│   ├── docs/
+│   │   ├── OPENCLAW_TURBO.md
+│   │   ├── ACTION_DRAFT_PROTOCOL.md
+│   │   ├── PERSONAL_ASSISTANT_TURBO.md
+│   │   ├── WORKFLOWS.md
+│   │   ├── SECURITY.md
+│   │   ├── N8N_WORKFLOW_BUILDER.md
+│   │   └── N8N_UI_OPERATOR.md
+│   ├── infra/
+│   │   ├── docker-compose.yml
+│   │   ├── .env.example
+│   │   ├── openclaw/
+│   │   │   └── openclaw.json.patch.internal.example
+│   │   └── postgres/
+│   │       └── init/
+│   │           ├── 001_extensions.sql
+│   │           └── 010_tables.sql
+│   └── n8n/
+│       └── workflows/
+│           ├── WF_01_Ingest_Message.json
+│           ├── WF_02_Hunter_Run.json
+│           ├── WF_03_Analyst_Draft_and_Telegram_Approval.json
+│           ├── WF_04_Executor_On_Approve.json
+│           ├── WF_10_Turbo_OpenClaw_Run.json
+│           ├── WF_11_Turbo_OpenClaw_UI_Operator.json
+│           ├── WF_12_Turbo_OpenClaw_Run_RawBody.json
+│           └── WF_20_Builder_Create_Workflow_via_API.json
+└── services/
+  └── clawd_worker/
+    ├── Dockerfile
+    └── app/
+      └── main.py
 ```
 
 ---

@@ -1,0 +1,26 @@
+{
+  "name": "WF_12_Turbo_OpenClaw_Run_RawBody (skeleton)",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "turbo/openclaw/run-raw",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "OpenClaw /v1/responses (raw body)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/responses",
+        "method": "POST",
+        "jsonParameters": true,
+        "sendBody": true,
+        "headerParametersJson": "={{JSON.stringify({ Authorization: 'Bearer ' + $env.OPENCLAW_GATEWAY_TOKEN })}}",
+        "body": "={{JSON.stringify({ model: 'openclaw:main', user: $json.user_key || ('n8n:' + ($json.trace_id || $now)), input: $json.input || $json.prompt || JSON.stringify($json) })}}"
+      }
+    }
+  ],
+  "connections": {}
+}

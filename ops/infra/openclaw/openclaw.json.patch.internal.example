@@ -1,0 +1,12 @@
+// Enable only OpenResponses endpoint (safer default)
+// Merge into your ~/.openclaw/openclaw.json and restart gateway.
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "responses": { "enabled": true },
+        "chatCompletions": { "enabled": false }
+      }
+    }
+  }
+}

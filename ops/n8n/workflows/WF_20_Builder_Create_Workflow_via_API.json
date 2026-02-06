@@ -1,0 +1,45 @@
+{
+  "name": "WF_20_Builder_Create_Workflow_via_API (skeleton)",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "builder/workflow/create",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "OpenClaw - generate workflow JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/responses",
+        "method": "POST",
+        "jsonParameters": true,
+        "sendBody": true,
+        "headerParametersJson": "={{JSON.stringify({ Authorization: 'Bearer ' + $env.OPENCLAW_GATEWAY_TOKEN })}}",
+        "body": "={{JSON.stringify({ model: 'openclaw:main', user: 'n8n:builder', input: $json.prompt || ('Generate n8n workflow export JSON. Return ONLY JSON. Spec: ' + JSON.stringify($json)) })}}"
+      }
+    },
+    {
+      "name": "(TODO) Extract JSON",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// TODO: parse OpenClaw response and extract workflow JSON\n// For now, pass-through\nreturn [{ json: { workflow: $json } }];"
+      }
+    },
+    {
+      "name": "n8n API - create workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{$env.N8N_BASE_URL}}/api/v1/workflows",
+        "method": "POST",
+        "jsonParameters": true,
+        "sendBody": true,
+        "headerParametersJson": "={{JSON.stringify({ 'X-N8N-API-KEY': $env.N8N_API_KEY })}}",
+        "body": "={{JSON.stringify($json.workflow || {})}}"
+      }
+    }
+  ],
+  "connections": {}
+}
