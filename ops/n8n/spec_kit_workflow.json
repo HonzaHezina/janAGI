@@ -1,0 +1,179 @@
+{
+  "name": "janAGI • Spec-Kit • Refine & Execute",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "janagi/spec/flow",
+        "httpMethod": "POST",
+        "responseMode": "lastNode"
+      },
+      "id": "Webhook",
+      "name": "Webhook (Message In)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const b = $json.body || $json;\nconst app = (b.app_name || 'spec-app').toLowerCase().replace(/[^a-z0-9-]/g,'-');\nconst run_id = b.run_id || `run-${Date.now()}`;\nconst root = process.env.WORK_ROOT || '/data/janagi-builds';\nconst run_dir = `${root}/${app}/runs/${run_id}`;\n\nreturn [{\n  app_name: app,\n  run_id: run_id,\n  run_dir: run_dir,\n  user_message: b.message || '',\n  force_execute: b.force_execute || false\n}];"
+      },
+      "id": "Context",
+      "name": "Init Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nmkdir -p \"{{$json.run_dir}}\"\n\nCONTEXT_FILE=\"{{$json.run_dir}}/context.json\"\nLOCKED_FILE=\"{{$json.run_dir}}/locked.json\"\n\n# Initialize context if needed\nif [ ! -f \"$CONTEXT_FILE\" ]; then echo '{}' > \"$CONTEXT_FILE\"; fi\n\n# Check state\nSTATE=\"refine\"\nif [ -f \"$LOCKED_FILE\" ]; then STATE=\"execute\"; fi\n\necho \"{\\\"state\\\": \\\"$STATE\\\", \\\"context_path\\\": \\\"$CONTEXT_FILE\\\", \\\"locked_path\\\": \\\"$LOCKED_FILE\\\"}\""
+      },
+      "id": "CheckState",
+      "name": "Check State (Refine vs Execute)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"CheckState\"].json.stdout}}",
+              "operation": "contains",
+              "value2": "\"state\": \"execute\""
+            }
+          ]
+        }
+      },
+      "id": "IsLocked",
+      "name": "Is Locked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{'Bearer ' + $env.OPENCLAW_GATEWAY_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{JSON.stringify({\n  model: \"openclaw:main\",\n  temperature: 0.2,\n  messages: [\n    {\n      role: \"system\",\n      content: \"You are OpenClaw Dispatcher (REFINE MODE). See Contract Document for protocol. Ask minimal questions to define Spec Kit inputs. Return JSON {phase:'refine', needs_input:bool, questions:[], locked:{...} optional}.\"\n    },\n    {\n      role: \"user\",\n      content: JSON.stringify({\n        current_message: $node['Context'].json.user_message,\n        prior_context: true // simplify for template\n      })\n    }\n  ]\n})}}"
+      },
+      "id": "RefineLLM",
+      "name": "Call OpenClaw (Refine)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 100]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const resp = JSON.parse($json.choices?.[0]?.message?.content || '{}');\nreturn { json: resp };"
+      },
+      "id": "ParseRefine",
+      "name": "Parse Refine Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.needs_input}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "NeedsInput",
+      "name": "Needs Input?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1300, 100]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nLOCKED_FILE=\"{{$node['Context'].json.run_dir}}/locked.json\"\n\n# Save locked payload from LLM output\necho '{{JSON.stringify($json.locked)}}' > \"$LOCKED_FILE\"\n"
+      },
+      "id": "SaveLocked",
+      "name": "Save Locked State",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1500, 200]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\n# Invoke the unified execution script\n/root/janAGI/ops/scripts/openclaw_spec_execute.sh \\\n  \"{{$node['Context'].json.run_dir}}/locked.json\" \\\n  \"{{$node['Context'].json.run_dir}}\" \\\n  \"{{$env.WORK_ROOT}}\"\n"
+      },
+      "id": "ExecuteScript",
+      "name": "EXECUTE (Script)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1700, 300]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{JSON.stringify($json)}}",
+        "options": {}
+      },
+      "id": "RespondQuestions",
+      "name": "Respond (Questions)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1500, -100]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{$node['ExecuteScript'].json.stdout}}",
+        "options": {}
+      },
+      "id": "RespondResult",
+      "name": "Respond (Done)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (Message In)": { "main": [[{ "node": "Context", "type": "main", "index": 0 }]] },
+    "Context": { "main": [[{ "node": "CheckState", "type": "main", "index": 0 }]] },
+    "CheckState": { "main": [[{ "node": "IsLocked", "type": "main", "index": 0 }]] },
+    "IsLocked": { 
+      "main": [
+        [{ "node": "ExecuteScript", "type": "main", "index": 0 }], 
+        [{ "node": "RefineLLM", "type": "main", "index": 0 }]
+      ] 
+    },
+    "RefineLLM": { "main": [[{ "node": "ParseRefine", "type": "main", "index": 0 }]] },
+    "ParseRefine": { "main": [[{ "node": "NeedsInput", "type": "main", "index": 0 }]] },
+    "NeedsInput": { 
+      "main": [
+        [{ "node": "RespondQuestions", "type": "main", "index": 0 }], 
+        [{ "node": "SaveLocked", "type": "main", "index": 0 }]
+      ] 
+    },
+    "SaveLocked": { "main": [[{ "node": "ExecuteScript", "type": "main", "index": 0 }]] },
+    "ExecuteScript": { "main": [[{ "node": "RespondResult", "type": "main", "index": 0 }]] }
+  }
+}
