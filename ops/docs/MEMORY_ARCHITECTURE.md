@@ -1,111 +1,107 @@
-# JanAGI Memory Architecture
-
-This document describes the shared memory architecture for JanAGI, enabling collaboration between **n8n** (Orchestrator) and **OpenClaw** (Agent) using a centralized PostgreSQL `pgvector` store.
+# Memory Architecture
 
 ## Overview
 
-The system uses a **Single Source of Truth** for long-term memory (RAG) and audit logs.
-- **Database**: PostgreSQL (with `pgvector` and `pgcrypto` extensions).
-- **Location**: Running in the same Docker Stack / Coolify Project as n8n.
-- **Access**:
-    - **n8n**: Direct SQL access (via Postgres Nodes) for `UPSERT` and `SELECT`.
-    - **OpenClaw**: Indirect access via n8n Webhooks (API Layer) for safety and audit.
+janAGI uses a **unified memory system** built on PostgreSQL + pgvector.
+All data flows through the `rag.*` schema — there is no separate `chat.*` schema.
 
-## Database Schema
+- **Short-term memory**: `rag.events` (append-only message log per conversation)
+- **Long-term memory**: `rag.chunks` (embedded text for semantic search)
+- **Artifacts**: `rag.artifacts` (generated files, specs, diffs)
 
-The database is split into logical schemas to separate "Semantic Memory" from "Audit Logs".
+## Memory Access Patterns
 
-### 1. RAG Memory (`rag.janagi_documents`)
-Stores semantic knowledge, specifications, and long-term facts.
-*   **Use Case**: RAG (Retrieval-Augmented Generation).
-*   **Key Columns**:
-    *   `content` (Text): The chunk of information.
-    *   `embedding` (Vector): 1024 (Mistral/Gemini) or 1536 (OpenAI).
-    *   `namespace` (Text): Scope (e.g., `janagi`, `project-x`).
-    *   `metadata` (JSONB): Source trace, tags, original URL.
+### From n8n (Direct SQL)
+n8n uses Postgres nodes to call stored functions:
+- `rag.start_run()` — Initialize a session
+- `rag.log_event()` — Record messages, tool calls, errors
+- `rag.search_chunks()` — Semantic search over knowledge base
+- `rag.finish_run()` — Close session
 
-### 2. Chat Audit (`chat.messages`)
-Stores the raw conversation history for debugging and short-term context.
-*   **Use Case**: Chat history display, debugging, short-term context window.
-*   **Key Columns**:
-    *   `chat_id`, `platform`, `role`, `content`.
+### From OpenClaw (via n8n Webhooks)
+OpenClaw cannot access the database directly. It uses HTTP webhooks:
+- `POST /webhook/memory-upsert` — Store new knowledge
+- `POST /webhook/memory-search` — Query existing knowledge
 
-## Workflow Protocols
+## Workflow: Chat with Memory
 
-### A. Memory Upsert (Writing to Memory)
-**Trigger**: Webhook `POST /webhook/memory-upsert`
-**Payload**:
+```mermaid
+sequenceDiagram
+    participant U as Telegram User
+    participant N as n8n
+    participant DB as PostgreSQL
+    participant AI as AI Agent
+
+    U->>N: Message
+    N->>DB: rag.start_run('janagi', 'janagi', chat_id, 'chat')
+    N->>DB: rag.log_event(run_id, 'message', 'user', text)
+    N->>DB: rag.search_chunks('janagi', embed(text), 0.5, 5)
+    DB-->>N: Top-K relevant chunks
+    N->>AI: System prompt + context + user message
+    AI-->>N: Response (may include [[MEMORY: ...]])
+    N->>DB: rag.log_event(run_id, 'message', 'assistant', response)
+    
+    opt Agent extracted a fact
+        N->>DB: INSERT INTO rag.chunks (embed + store)
+    end
+    
+    N->>U: Telegram reply
+    N->>DB: rag.finish_run(run_id)
+```
+
+## Workflow: Memory Upsert (Webhook API)
+
+**Endpoint**: `POST /webhook/memory-upsert`
+
 ```json
 {
+  "content": "Coolify requires pgvector image for vector support.",
   "namespace": "janagi",
-  "content": "Deploying on Coolify requires the pgvector image.",
-  "metadata": { "source": "openclaw", "trace_id": "..." }
+  "metadata": { "source": "chat_extraction", "chat_id": "123" }
 }
 ```
-**Process**:
-1.  **Embed**: Generate vector from `content` using the standard Embedding Model.
-2.  **Format**: Convert vector array to string format `[...]`.
-3.  **Insert**: Execute SQL `INSERT INTO rag.janagi_documents ...`.
 
-### B. Memory Search (Reading from Memory)
-**Trigger**: Webhook `POST /webhook/memory-search`
-**Payload**:
+**Process**:
+1. Receive content via webhook
+2. Generate embedding via OpenAI `text-embedding-3-small` (1536 dimensions)
+3. Format embedding array as string for pgvector
+4. `INSERT INTO rag.chunks` with project lookup by namespace
+
+## Workflow: Memory Search (Webhook API)
+
+**Endpoint**: `POST /webhook/memory-search`
+
 ```json
 {
-  "namespace": "janagi",
   "query": "How do I deploy on Coolify?",
+  "namespace": "janagi",
   "top_k": 5
 }
 ```
+
 **Process**:
-1.  **Embed**: Generate vector from `query`.
-2.  **Search**: Execute SQL `SELECT ... ORDER BY embedding <=> $1 LIMIT $2`.
-3.  **Return**: JSON list of matches.
+1. Embed query text
+2. Call `rag.search_chunks(namespace, embedding, 0.5, top_k)`
+3. Return ranked results with similarity scores
 
-### C. Chat Interaction Flow (Telegram/Chat)
-1.  **Ingest**: Telegram Trigger receives message.
-2.  **Log User**: Insert into `chat.messages` (Role: `user`).
-3.  **Retrieve Context**: Call `Memory Search` with user query.
-4.  **AI Process**: Agent (Jackie/OpenClaw) processes query + retrieved context.
-    *   *Decision*: Should this new info be stored?
-5.  **Log Assistant**: Insert into `chat.messages` (Role: `assistant`).
-6.  **Store (Optional)**: If Agent decided to store data, call `Memory Upsert`.
-7.  **Reply**: Send message back to Telegram.
+## Action Parsing
 
-## Integration Configuration
+The AI Agent can embed structured commands in its response:
+- `[[MEMORY: some fact]]` — Triggers memory upsert
+- `[[TRIGGER_SPEC: project-name]]` — Triggers Spec-Kit sub-workflow
 
-### n8n
-- **Credentials**: Use `Postgres` credentials pointing to the `postgresql` service in the stack.
-- **Nodes**: Use `Embeddings` node + `Postgres` node.
+The n8n Code Node parses these tokens and routes accordingly.
 
-### OpenClaw
-- **Env**: `N8N_BASE_URL=http://n8n:5678` (Internal Docker Network URL).
-- **Operation**: Calls n8n Webhooks to read/write memory.
+## RAG Index Structure
 
-## Orchestration Logic (Main Chat Flow)
-
-The system uses a "Router" pattern to handle conversations:
-
-```mermaid
-graph TD
-    User[Telegram User] -->|Message| T[Trigger]
-    T -->|Insert| SQL1[(chat.messages)]
-    SQL1 --> SEARCH[Webhook: /memory-search]
-    SEARCH -->|Context| AI[AI Agent Router]
-    AI -->|Decision| A[Parser]
-    
-    A -->|Text Response| SQL2[(chat.messages)]
-    SQL2 --> REPLY[Telegram Reply]
-    
-    A -->|Extraction| MEM{New Info?}
-    MEM -->|Yes| UPSERT[Webhook: /memory-upsert]
-    UPSERT --> SQL_MEM[(rag.documents)]
-
-    A -->|Intent| SPEC{Start Spec?}
-    SPEC -->|Yes| WORK[Webhook: Spec Kit Flow]
+```
+rag.sources (where data comes from)
+  └── rag.documents (parent units, deduplicated by hash)
+       └── rag.chunks (embedded text fragments, searchable)
 ```
 
-### Flow Components
-1. **Audit Logging**: Every message is strictly logged to `chat.messages` before processing.
-2. **Context Injection**: RAG is performed *before* the LLM sees the prompt.
-3. **Action Parsing**: The LLM outputs special tokens like `[[MEMORY: ...]]` or `[[TRIGGER_SPEC: ...]]` which n8n parses to triger side-effects.
+Each chunk has:
+- `content` — The actual text
+- `embedding` — 1536-dimension vector (HNSW indexed)
+- `metadata` — JSONB for tags, source info, timestamps
+- `chunk_index` — Position within parent document

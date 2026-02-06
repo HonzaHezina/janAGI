@@ -1,20 +1,38 @@
-# Update notes – 2026-02-06
+# Update Notes — 2026-02-06
 
-This update reflects the OpenClaw ↔ n8n integration discussed after finishing OpenClaw onboarding.
+## Major Changes
 
-## What changed
+### Repository Overhaul
+- **README.md**: Complete rewrite. Now accurately describes janAGI as an autonomous personal AI agent (Jackie) with Telegram interface, RAG memory, and Spec-Kit dispatcher.
+- **ARCHITECTURE.md**: Rewritten for Chat + Memory + Spec-Kit focus (removed old "lead scraping" framing).
+- **CONTRIBUTING.md**: Updated with correct project context and structure.
 
-### Docs
-- Added Turbo docs under `ops/docs/`:
-  - correct endpoint/body shapes
-  - Docker/Coolify-safe base URLs (`http://openclaw:18789`, not localhost)
-  - fixes for 405/404/429
-  - robust n8n body pattern using `JSON.stringify(...)`
-- Added Action Draft protocol with Telegram-safe payload markers and extraction code
-- Added Workflow Builder (API-first) pattern
+### Database Schema (`020_rag_schema.sql`)
+- Replaced old `janagi_documents` table with proper RAG pipeline: `rag.sources` → `rag.documents` → `rag.chunks`.
+- Added `rag.artifacts` table for generated files/specs.
+- Added PL/pgSQL stored functions: `start_run()`, `log_event()`, `finish_run()`, `search_chunks()`.
+- Embedding dimension: 1536 (OpenAI text-embedding-3-small).
+- Index: HNSW (`vector_cosine_ops`) instead of IVFFlat.
 
-### n8n templates
-- Added Turbo runner workflows and builder workflow in `ops/n8n/workflows/`
+### n8n Workflows
+- **New**: `main_chat_orchestrator.json` — Full Telegram chat loop with memory.
+- **New**: `memory_workflows.json` — Webhook API for memory upsert/search.
+- **Updated**: All workflows now use `rag.start_run()` / `rag.log_event()` instead of raw INSERT.
+- **Updated**: Memory search uses `rag.search_chunks()` function.
 
-### Env example
-- Added `OPENCLAW_BASE_URL`, `OPENCLAW_GATEWAY_TOKEN`, `N8N_BASE_URL`, `N8N_API_KEY` to `ops/infra/.env.example`
+### Documentation
+- **DB_SCHEMA.md**: Rewritten to document all tables, functions, and usage patterns.
+- **MEMORY_ARCHITECTURE.md**: Rewritten — unified `rag.*` schema, no separate `chat.*`.
+- **RAG.md**: Updated with actual implementation (chunks, HNSW, 1536d).
+- **WORKFLOWS.md**: Now indexes all workflow files including new core workflows.
+- **COOLIFY_EXISTING_RESOURCES.md**: Updated with correct DB name (`n8n`), hostname (`postgresql`).
+- **RUNBOOK_COOLIFY.md**: Practical deployment instructions with correct credentials.
+
+### Infrastructure
+- **.env.example**: DB name changed from `janagi` to `n8n` (matching actual Coolify setup). OpenAI replaces Mistral as primary embedding provider.
+- Removed `021_chat_schema.sql` migration (not needed — building from scratch).
+
+## Breaking Changes
+- Table `rag.janagi_documents` no longer exists. Use `rag.chunks` instead.
+- DB name is `n8n`, not `janagi`.
+- Postgres hostname in Docker is `postgresql`, not `postgres`.

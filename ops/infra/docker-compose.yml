@@ -1,18 +1,23 @@
+# janAGI Docker Stack
+# Deploy via Coolify or `docker compose up -d`
+# NOTE: In Coolify, the Postgres hostname becomes `postgresql` (managed by Coolify).
+#       When running standalone, the hostname is `postgres` (the service name below).
+
 services:
   postgres:
     image: pgvector/pgvector:0.8.0-pg16
     restart: unless-stopped
     env_file: .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB:-n8n}
+      POSTGRES_USER: ${POSTGRES_USER:-n8n}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      TZ: ${TZ}
+      TZ: ${TZ:-Europe/Prague}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-n8n} -d ${POSTGRES_DB:-n8n}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -25,67 +30,55 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # n8n internal DB (stores workflows, credentials)
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
       DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
-      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-n8n}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-n8n}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
 
-      N8N_HOST: ${N8N_HOST}
-      N8N_PORT: ${N8N_PORT}
-      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      # n8n server config
+      N8N_HOST: ${N8N_HOST:-0.0.0.0}
+      N8N_PORT: ${N8N_PORT:-5678}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-https}
       WEBHOOK_URL: ${WEBHOOK_URL}
       N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
-
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
 
-      TZ: ${TZ}
-      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      # Timezone
+      TZ: ${TZ:-Europe/Prague}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Europe/Prague}
 
+      # Payload size (for large embeddings)
       N8N_PAYLOAD_SIZE_MAX: 64
 
-      # Optional env (used by some workflows)
-      OPENCLAW_BASE_URL: ${OPENCLAW_BASE_URL}
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      N8N_BASE_URL: ${N8N_BASE_URL}
-      N8N_API_KEY: ${N8N_API_KEY}
-      N8N_INTERNAL_URL: ${N8N_INTERNAL_URL}
-      N8N_OPERATOR_EMAIL: ${N8N_OPERATOR_EMAIL}
-      N8N_OPERATOR_PASSWORD: ${N8N_OPERATOR_PASSWORD}
+      # Optional: OpenClaw integration
+      OPENCLAW_BASE_URL: ${OPENCLAW_BASE_URL:-http://openclaw:18789}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+
+      # Optional: n8n API / Workflow Builder
+      N8N_BASE_URL: ${N8N_BASE_URL:-http://n8n:5678}
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      N8N_INTERNAL_URL: ${N8N_INTERNAL_URL:-http://n8n:5678}
 
     ports:
       - "${N8N_PORT:-5678}:5678"
     volumes:
       - n8n_data:/home/node/.n8n
 
-  mindsdb:
-    image: mindsdb/mindsdb:latest
-    restart: unless-stopped
-    env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      TZ: ${TZ}
-    volumes:
-      - mindsdb_data:${MINDSDB_STORAGE:-/root/mdb_storage}
-    ports:
-      - "47334:47334"
-      - "47335:47335"
-
-  clawd_worker:
-    build:
-      context: ../../services/clawd_worker
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      TZ: ${TZ}
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-    ports:
-      - "8090:8090"
+  # Optional: Web scraping worker
+  # Uncomment when needed
+  # clawd_worker:
+  #   build:
+  #     context: ../../services/clawd_worker
+  #   restart: unless-stopped
+  #   env_file: .env
+  #   environment:
+  #     TZ: ${TZ:-Europe/Prague}
+  #   ports:
+  #     - "8090:8090"
 
 volumes:
   postgres_data:
   n8n_data:
-  mindsdb_data:

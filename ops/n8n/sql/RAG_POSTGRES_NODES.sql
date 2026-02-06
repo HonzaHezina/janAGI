@@ -1,214 +1,123 @@
--- n8n Postgres node snippets (rag.*)
+-- n8n Postgres node SQL templates (rag.*)
 --
--- Why this file exists:
--- - n8n Postgres node does NOT accept named placeholders like :client_id
--- - Use positional parameters ($1..$n) + the node's "Query Parameters" list
--- - Cast text literals to ::text to avoid "unknown" signature mismatches
+-- These snippets match the stored functions in 020_rag_schema.sql.
+-- Use positional parameters ($1..$n) in n8n's "Query Parameters" field.
 --
--- Conventions used below:
--- - $1..$n are in the exact order shown in each snippet's "PARAMS" block
--- - Thread keys are stored as TEXT (Telegram chat_id can be negative)
+-- Functions available:
+--   rag.start_run(client_key, project_key, conversation_key, run_type, metadata) → uuid
+--   rag.log_event(run_id, event_type, actor_role, content, payload) → uuid
+--   rag.finish_run(run_id, status) → void
+--   rag.search_chunks(project_key, embedding, threshold, count) → table
 --
 
--- ==================================
--- 0) Ensure IDs exist (one-time-ish)
--- ==================================
--- Use this when you want stable IDs driven by keys.
+-- =============================
+-- 1) Start a new run
+-- =============================
 -- PARAMS:
---   $1 = client_key (text)  e.g. 'janagi'
---   $2 = client_name (text) e.g. 'janAGI'
---   $3 = project_key (text) e.g. 'main'
---   $4 = project_name (text) e.g. 'Main'
-WITH c AS (
-  SELECT rag.get_or_create_client($1::text, $2::text) AS client_id
-), p AS (
-  SELECT rag.get_or_create_project(c.client_id, $3::text, $4::text) AS project_id
-  FROM c
+--   $1 = client_key (text)       e.g. 'janagi'
+--   $2 = project_key (text)      e.g. 'janagi'
+--   $3 = conversation_key (text) e.g. Telegram chat_id as text
+--   $4 = run_type (text)         e.g. 'chat', 'tool', 'spec_audit'
+SELECT rag.start_run($1, $2, $3, $4) AS run_id;
+
+
+-- =============================
+-- 2) Log user message
+-- =============================
+-- PARAMS:
+--   $1 = run_id (uuid)     from start_run result
+--   $2 = content (text)    the user's message text
+--   $3 = payload (jsonb)   optional: raw Telegram message JSON
+SELECT rag.log_event($1, 'message', 'user', $2, COALESCE($3::jsonb, '{}'::jsonb)) AS event_id;
+
+
+-- =============================
+-- 3) Log assistant response
+-- =============================
+-- PARAMS:
+--   $1 = run_id (uuid)
+--   $2 = content (text)    the assistant's response text
+--   $3 = payload (jsonb)   optional: model metadata, tokens used, etc.
+SELECT rag.log_event($1, 'message', 'assistant', $2, COALESCE($3::jsonb, '{}'::jsonb)) AS event_id;
+
+
+-- =============================
+-- 4) Log action draft (approval pending)
+-- =============================
+-- PARAMS:
+--   $1 = run_id (uuid)
+--   $2 = draft_json (jsonb)  the ACTION_DRAFT payload
+SELECT rag.log_event($1, 'action_draft', 'assistant', NULL, $2::jsonb) AS event_id;
+
+
+-- =============================
+-- 5) Log approval callback
+-- =============================
+-- PARAMS:
+--   $1 = run_id (uuid)
+--   $2 = approval_payload (jsonb)  e.g. {"decision": "approved", "callback_data": "..."}
+SELECT rag.log_event($1, 'approval', 'user', NULL, $2::jsonb) AS event_id;
+
+
+-- =============================
+-- 6) Log tool call
+-- =============================
+-- PARAMS:
+--   $1 = run_id (uuid)
+--   $2 = content (text)    tool name or description
+--   $3 = payload (jsonb)   tool input/output
+SELECT rag.log_event($1, 'tool_call', 'system', $2, $3::jsonb) AS event_id;
+
+
+-- =============================
+-- 7) Load recent conversation history
+-- =============================
+-- PARAMS:
+--   $1 = run_id (uuid)   — we look up conversation_id from the run
+--   $2 = limit (int)     — number of recent events to load
+SELECT e.event_type, e.actor_role, e.content, e.payload, e.created_at
+FROM rag.events e
+JOIN rag.runs r ON r.id = $1::uuid
+WHERE e.run_id IN (
+  SELECT id FROM rag.runs WHERE conversation_id = r.conversation_id
 )
-SELECT (SELECT client_id FROM c) AS client_id,
-       (SELECT project_id FROM p) AS project_id;
-
-
--- =============================
--- 1) Start run for a thread
--- =============================
--- PARAMS:
---   $1 = client_id (uuid)
---   $2 = project_id (uuid)
---   $3 = channel (text)     e.g. 'telegram'
---   $4 = thread_key (text)  e.g. chat_id as text
---   $5 = run_type (text)    e.g. 'chat'
---   $6 = title (text)       nullable
---   $7 = run_metadata (jsonb)
---   $8 = conversation_metadata (jsonb)
-SELECT *
-FROM rag.start_run_for_thread(
-  $1::uuid,
-  $2::uuid,
-  $3::text,
-  $4::text,
-  $5::text,
-  NULLIF($6::text, ''),
-  COALESCE($7::jsonb, '{}'::jsonb),
-  COALESCE($8::jsonb, '{}'::jsonb)
-);
-
-
--- =============================
--- 2) Log an incoming user msg
--- =============================
--- PARAMS:
---   $1 = client_id (uuid)
---   $2 = project_id (uuid)
---   $3 = conversation_id (uuid)
---   $4 = run_id (uuid)
---   $5 = channel (text)     e.g. 'telegram'
---   $6 = content (text)
---   $7 = payload (jsonb)    raw Telegram message or normalized JSON
-SELECT rag.log_event(
-  $1::uuid,
-  $2::uuid,
-  $3::uuid,
-  $4::uuid,
-  'message'::text,
-  'user'::text,
-  $5::text,
-  $6::text,
-  COALESCE($7::jsonb, '{}'::jsonb),
-  NULL
-) AS event_id;
-
-
--- =================================
--- 3) Load recent history (events)
--- =================================
--- PARAMS:
---   $1 = conversation_id (uuid)
---   $2 = limit (int)
-SELECT
-  event_no,
-  event_ts,
-  actor_role,
-  content,
-  payload
-FROM rag.events
-WHERE conversation_id = $1::uuid
-  AND event_type = 'message'::text
-  AND actor_role IN ('user'::text, 'assistant'::text)
-ORDER BY event_no DESC
+AND e.event_type = 'message'
+AND e.actor_role IN ('user', 'assistant')
+ORDER BY e.created_at DESC
 LIMIT $2::int;
 
 
--- =====================================
--- 4) Log assistant response (non-draft)
--- =====================================
+-- =============================
+-- 8) Semantic search (RAG retrieval)
+-- =============================
 -- PARAMS:
---   $1 = client_id (uuid)
---   $2 = project_id (uuid)
---   $3 = conversation_id (uuid)
---   $4 = run_id (uuid)
---   $5 = channel (text)
---   $6 = content (text)
---   $7 = payload (jsonb)
-SELECT rag.log_event(
-  $1::uuid,
-  $2::uuid,
-  $3::uuid,
-  $4::uuid,
-  'message'::text,
-  'assistant'::text,
-  $5::text,
-  $6::text,
-  COALESCE($7::jsonb, '{}'::jsonb),
-  NULL
-) AS event_id;
-
-
--- ==================================
--- 5) Store Action Draft (pending)
--- ==================================
--- PARAMS:
---   $1 = client_id (uuid)
---   $2 = project_id (uuid)
---   $3 = conversation_id (uuid)
---   $4 = run_id (uuid)
---   $5 = channel (text)
---   $6 = draft_json (jsonb)  (2nd line payload from ACTION_DRAFT)
-SELECT rag.log_event(
-  $1::uuid,
-  $2::uuid,
-  $3::uuid,
-  $4::uuid,
-  'action_draft'::text,
-  'assistant'::text,
-  $5::text,
-  NULL,
-  COALESCE($6::jsonb, '{}'::jsonb),
-  NULL
-) AS event_id;
-
-
--- ==================================
--- 6) Log approval callback
--- ==================================
--- PARAMS:
---   $1 = client_id (uuid)
---   $2 = project_id (uuid)
---   $3 = conversation_id (uuid)
---   $4 = run_id (uuid)
---   $5 = channel (text)
---   $6 = approval_payload (jsonb)
-SELECT rag.log_event(
-  $1::uuid,
-  $2::uuid,
-  $3::uuid,
-  $4::uuid,
-  'approval'::text,
-  'user'::text,
-  $5::text,
-  NULL,
-  COALESCE($6::jsonb, '{}'::jsonb),
-  NULL
-) AS event_id;
+--   $1 = project_key (text)     e.g. 'janagi'
+--   $2 = embedding (vector)     the query embedding as string
+--   $3 = threshold (float)      e.g. 0.5
+--   $4 = match_count (int)      e.g. 5
+SELECT * FROM rag.search_chunks($1, $2::vector, $3::float, $4::int);
 
 
 -- =============================
--- 7) Save an artifact
+-- 9) Save an artifact
 -- =============================
 -- PARAMS:
---   $1 = client_id (uuid)
---   $2 = project_id (uuid)
---   $3 = conversation_id (uuid) nullable
---   $4 = run_id (uuid) nullable
---   $5 = kind (text)
---   $6 = mime_type (text) nullable
---   $7 = text_content (text) nullable
---   $8 = json_content (jsonb) nullable
-INSERT INTO rag.artifacts (
-  client_id, project_id, conversation_id, run_id,
-  kind, mime_type, text_content, json_content
-) VALUES (
-  $1::uuid,
-  $2::uuid,
-  NULLIF($3::text, '')::uuid,
-  NULLIF($4::text, '')::uuid,
-  $5::text,
-  NULLIF($6::text, ''),
-  NULLIF($7::text, ''),
-  $8::jsonb
-)
+--   $1 = run_id (uuid)
+--   $2 = project_id (uuid)     from run context
+--   $3 = key (text)            e.g. 'locked.json', 'spec.md'
+--   $4 = type (text)           e.g. 'json', 'file', 'text'
+--   $5 = content (text)        text content
+--   $6 = data (jsonb)          structured data (nullable)
+INSERT INTO rag.artifacts (run_id, project_id, key, type, content, data)
+VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb)
+ON CONFLICT (run_id, key) DO UPDATE SET content = EXCLUDED.content, data = EXCLUDED.data
 RETURNING id AS artifact_id;
 
 
 -- =============================
--- 8) Finish run
+-- 10) Finish run
 -- =============================
 -- PARAMS:
 --   $1 = run_id (uuid)
---   $2 = status (text)
---   $3 = metadata_patch (jsonb)
-SELECT rag.finish_run(
-  $1::uuid,
-  COALESCE(NULLIF($2::text, ''), 'finished'::text),
-  COALESCE($3::jsonb, '{}'::jsonb)
-);
+--   $2 = status (text)   'completed' or 'failed'
+SELECT rag.finish_run($1, COALESCE(NULLIF($2, ''), 'completed'));

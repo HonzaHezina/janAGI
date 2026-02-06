@@ -1,40 +1,47 @@
-# n8n workflow templates
+# n8n Workflow Templates
 
-Templates live in [ops/n8n/workflows](ops/n8n/workflows/).
+All workflow JSON files are in `ops/n8n/`.
 
-## Included templates
+## Core Workflows
 
-Core domain workflows:
-- `WF_01_Ingest_Message.json`
-- `WF_02_Hunter_Run.json`
-- `WF_03_Analyst_Draft_and_Telegram_Approval.json`
-- `WF_04_Executor_On_Approve.json`
+| File | Webhook/Trigger | Purpose |
+|------|----------------|---------|
+| `main_chat_orchestrator.json` | Telegram Trigger | Main chat loop: Log → RAG Search → AI Agent → Parse Actions → Reply |
+| `memory_workflows.json` | `/webhook/memory-upsert`, `/webhook/memory-search` | Memory API: embed + store/search in `rag.chunks` |
+| `spec_kit_workflow.json` | `/webhook/janagi/spec/flow` | Spec-Kit: REFINE requirements → EXECUTE build |
 
-Turbo / OpenClaw:
-- `WF_10_Turbo_OpenClaw_Run.json` *(simple `/v1/responses` runner)*
-- `WF_11_Turbo_OpenClaw_UI_Operator.json` *(PLAN/APPLY/VERIFY pattern skeleton)*
-- `WF_12_Turbo_OpenClaw_Run_RawBody.json` *(same as WF_10 but uses `JSON.stringify` — most robust)*
+## Supporting Templates (in `workflows/`)
 
-Workflow Builder (API-first):
-- `WF_20_Builder_Create_Workflow_via_API.json` *(OpenClaw generates a workflow export JSON → n8n creates it via API)*
+| File | Purpose |
+|------|---------|
+| `WF_01_Ingest_Message.json` | Webhook → embed → store to `rag.chunks` |
+| `WF_02_Hunter_Run.json` | Scheduled data collection via `clawd_worker` |
+| `WF_03_Analyst_Draft_and_Telegram_Approval.json` | RAG retrieval → LLM draft → Telegram approval |
+| `WF_04_Executor_On_Approve.json` | Execute on Telegram callback approval |
+| `WF_10_Turbo_OpenClaw_Run.json` | Direct OpenClaw `/v1/responses` call |
+| `WF_11_Turbo_OpenClaw_UI_Operator.json` | OpenClaw PLAN/APPLY/VERIFY pattern |
+| `WF_12_Turbo_OpenClaw_Run_RawBody.json` | OpenClaw call with `JSON.stringify` body |
+| `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via REST API |
 
-## Import
-1) n8n → Workflows → Import from file
-2) Create credentials (Postgres, Telegram, OpenClaw token, n8n API key, etc.)
-3) Replace env placeholders with your real values (Coolify env/secrets)
+## Reusable Snippets
 
-## Notes
+- `snippets/TELEGRAM_NORMALIZATION.js` — Normalize Telegram message/callback/channel_post
+- `snippets/TELEGRAM_PAYLOAD_EXTRACTOR.js` — Extract hidden JSON from messages
+- `sql/RAG_POSTGRES_NODES.sql` — Copy-paste SQL for all Postgres nodes
 
-Recommended pattern:
-- Main assistant in n8n
-- OpenClaw is “Turbo” for browsing/UI/multi-step tasks
-- Use **Action Draft** + approval gate for anything risky
+## Import Instructions
 
-For wiring:
-- [ops/docs/PERSONAL_ASSISTANT_TURBO.md](ops/docs/PERSONAL_ASSISTANT_TURBO.md)
-- [ops/docs/OPENCLAW_TURBO.md](ops/docs/OPENCLAW_TURBO.md)
-- [ops/docs/N8N_WORKFLOW_BUILDER.md](ops/docs/N8N_WORKFLOW_BUILDER.md)
-- [ops/docs/ACTION_DRAFT_PROTOCOL.md](ops/docs/ACTION_DRAFT_PROTOCOL.md)
+1. In n8n: **Workflows → Import from File**
+2. Create required credentials:
+   - **Postgres** — pointing to `postgresql:5432` (internal Docker DNS)
+   - **Telegram** — Bot token
+   - **OpenAI** — API key for embeddings
+   - **HTTP Header Auth** — OpenClaw gateway token (if using Turbo)
+3. Activate workflows
 
-Spec Kit automation (OpenClaw gatekeeper + CLI implementers):
-- [ops/docs/SPECKIT_OPENCLAW_CLI.md](ops/docs/SPECKIT_OPENCLAW_CLI.md)
+## Related Docs
+- [ARCHITECTURE.md](ARCHITECTURE.md) — System design
+- [MEMORY_ARCHITECTURE.md](MEMORY_ARCHITECTURE.md) — Memory/RAG details
+- [ACTION_DRAFT_PROTOCOL.md](ACTION_DRAFT_PROTOCOL.md) — Approval gate pattern
+- [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) — OpenClaw integration
+- [SPECKIT_OPENCLAW_CLI.md](SPECKIT_OPENCLAW_CLI.md) — Spec-Kit autopilot
