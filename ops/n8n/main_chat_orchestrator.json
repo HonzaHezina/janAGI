@@ -20,9 +20,25 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO chat.messages (platform, chat_id, role, content, metadata)\nVALUES ($1, $2, 'user', $3, $4::jsonb)\nRETURNING id;",
+        "query": "SELECT rag.start_run($1, 'janagi', $2, 'chat')",
         "additionalFields": {
-          "queryParams": "='telegram',{{$json.message.chat.id}},{{$json.message.text}},{{JSON.stringify($json.message)}}"
+          "queryParams": "={{$json.message.chat.id}},{{$json.message.chat.id.toString()}}"
+        }
+      },
+      "name": "Start Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        460,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event($1, 'message', 'user', $2, $3::jsonb)",
+        "additionalFields": {
+          "queryParams": "={{$node[\"Start Run\"].json.start_run}},{{$json.message.text}},{{JSON.stringify($json.message)}}"
         }
       },
       "name": "Log User Msg",
@@ -30,7 +46,7 @@
       "typeVersion": 1,
       "position": [
         460,
-        300
+        400
       ]
     },
     {

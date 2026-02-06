@@ -84,7 +84,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO rag.janagi_documents (namespace, content, embedding, metadata)\nVALUES ($1, $2, $3::vector, $4::jsonb)\nRETURNING id;",
+        "query": "INSERT INTO rag.chunks (project_id, content, embedding, metadata)\nSELECT id as project_id, $2, $3::vector, $4::jsonb\nFROM rag.projects WHERE project_key = $1\nRETURNING id;",
         "additionalFields": {
           "queryParams": "={{$json.namespace || 'janagi'}},{{$json.content}},{{$json.embedding_vec}},{{JSON.stringify($json.metadata || {})}}"
         }
@@ -100,9 +100,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, content, metadata, 1 - (embedding <=> $1::vector) AS score, created_at\nFROM rag.janagi_documents\nWHERE namespace = $2\nORDER BY embedding <=> $1::vector\nLIMIT $3;",
+        "query": "SELECT * FROM rag.search_chunks($1, $2::vector, 0.5, $3)",
         "additionalFields": {
-          "queryParams": "={{$json.embedding_vec}},{{$json.namespace || 'janagi'}},{{$json.top_k || 5}}"
+          "queryParams": "={{$json.namespace || 'janagi'}},{{$json.embedding_vec}},{{$json.top_k || 5}}"
         }
       },
       "name": "Postgres Search",
