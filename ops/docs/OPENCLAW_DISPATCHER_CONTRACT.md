@@ -26,6 +26,10 @@ Protocol:
 3. DO NOT execute any commands or create files yet.
 
 Knowledge Base (Spec Kit Requirements):
+OpenClaw works with the JanAGI Shared Memory.
+- **Retrieval**: Before verifying a spec or task, check semantic memory via `POST /webhook/memory-search`.
+- **Storage**: After locking a spec (`locked.json`), store a summary via `POST /webhook/memory-upsert` with `doc_type=spec_summary`.
+
 To enable the CLI tools later, you must gather:
 - [Repo]: Owner, Name, Visibility.
 - [Constitution]: Constraints (Testing required? Strict linting? Minimal deps?).

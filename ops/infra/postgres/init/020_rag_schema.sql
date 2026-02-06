@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS rag.janagi_documents (
   namespace   text NOT NULL DEFAULT 'janagi',
   
   content     text NOT NULL,
-  embedding   vector(1024), -- Optimized for Mistral/Gemini Embeddings
+  embedding   vector(1536), -- Optimized for OpenAI text-embedding-3-small
   
   metadata    jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at  timestamptz NOT NULL DEFAULT now()
@@ -143,3 +143,20 @@ BEGIN
   RETURN NEXT;
 END;
 $$;
+
+-- 7. Chat Logs (Audit Trail - Simple)
+-- Stores raw messages for audit and debugging, distinct from the semantic 'Events'.
+CREATE SCHEMA IF NOT EXISTS chat;
+
+CREATE TABLE IF NOT EXISTS chat.messages (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform    text NOT NULL DEFAULT 'telegram', -- 'telegram', 'web', 'cli'
+  chat_id     text NOT NULL,
+  role        text NOT NULL,                 -- 'user', 'assistant', 'system', 'tool'
+  content     text NOT NULL,
+  metadata    jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS chat_messages_chat_idx ON chat.messages (platform, chat_id, created_at);
+

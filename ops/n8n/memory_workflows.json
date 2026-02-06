@@ -1,0 +1,155 @@
+{
+  "name": "JanAGI Memory API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "memory-upsert",
+        "options": {}
+      },
+      "name": "Webhook Upsert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "memory-search",
+        "options": {}
+      },
+      "name": "Webhook Search",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "query",
+        "model": "text-embedding-3-small",
+        "text": "={{$json.content}}"
+      },
+      "name": "Embed Content",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        660,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "query",
+        "model": "text-embedding-3-small",
+        "text": "={{$json.query}}"
+      },
+      "name": "Embed Query",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        660,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare embedding for pgvector format\nconst emb = $json.embedding ?? $json.data?.[0]?.embedding ?? $json.output?.[0]?.embedding;\n\nif (!emb || !Array.isArray(emb)) {\n  throw new Error(\"Embedding array not found\");\n}\n\nreturn [{\n  ...$json,\n  embedding_vec: JSON.stringify(emb)\n}];"
+      },
+      "name": "Format Vector Upsert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        860,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare embedding for pgvector format\nconst emb = $json.embedding ?? $json.data?.[0]?.embedding ?? $json.output?.[0]?.embedding;\n\nif (!emb || !Array.isArray(emb)) {\n  throw new Error(\"Embedding array not found\");\n}\n\nreturn [{\n  ...$json,\n  embedding_vec: JSON.stringify(emb)\n}];"
+      },
+      "name": "Format Vector Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        860,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO rag.janagi_documents (namespace, content, embedding, metadata)\nVALUES ($1, $2, $3::vector, $4::jsonb)\nRETURNING id;",
+        "additionalFields": {
+          "queryParams": "={{$json.namespace || 'janagi'}},{{$json.content}},{{$json.embedding_vec}},{{JSON.stringify($json.metadata || {})}}"
+        }
+      },
+      "name": "Postgres Insert",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, content, metadata, 1 - (embedding <=> $1::vector) AS score, created_at\nFROM rag.janagi_documents\nWHERE namespace = $2\nORDER BY embedding <=> $1::vector\nLIMIT $3;",
+        "additionalFields": {
+          "queryParams": "={{$json.embedding_vec}},{{$json.namespace || 'janagi'}},{{$json.top_k || 5}}"
+        }
+      },
+      "name": "Postgres Search",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ results: $json }) }}",
+        "options": {}
+      },
+      "name": "Respond Search",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ id: $json.id, status: 'stored' }) }}",
+        "options": {}
+      },
+      "name": "Respond Upsert",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Upsert": { "main": [ [ { "node": "Embed Content", "type": "main", "index": 0 } ] ] },
+    "Embed Content": { "main": [ [ { "node": "Format Vector Upsert", "type": "main", "index": 0 } ] ] },
+    "Format Vector Upsert": { "main": [ [ { "node": "Postgres Insert", "type": "main", "index": 0 } ] ] },
+    "Postgres Insert": { "main": [ [ { "node": "Respond Upsert", "type": "main", "index": 0 } ] ] },
+    "Webhook Search": { "main": [ [ { "node": "Embed Query", "type": "main", "index": 0 } ] ] },
+    "Embed Query": { "main": [ [ { "node": "Format Vector Search", "type": "main", "index": 0 } ] ] },
+    "Format Vector Search": { "main": [ [ { "node": "Postgres Search", "type": "main", "index": 0 } ] ] },
+    "Postgres Search": { "main": [ [ { "node": "Respond Search", "type": "main", "index": 0 } ] ] }
+  }
+}
