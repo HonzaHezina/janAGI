@@ -376,8 +376,48 @@ When validation commands fail on a branch:
 
 System instruction contracts for both roles are maintained separately:
 
-- **OpenClaw Dispatcher**: [`OPENCLAW_DISPATCHER_CONTRACT.md`](OPENCLAW_DISPATCHER_CONTRACT.md)
-- **CLI Implementer**: [`CLI_IMPLEMENTER_CONTRACT.md`](CLI_IMPLEMENTER_CONTRACT.md)
+- **OpenClaw Dispatcher**: [`OPENCLAW_DISPATCHER_CONTRACT.md`](OPENCLAW_DISPATCHER_CONTRACT.md) —
+  REFINE, EXECUTE, and Combined mode paste-ready system prompts
+- **CLI Implementer**: [`CLI_IMPLEMENTER_CONTRACT.md`](CLI_IMPLEMENTER_CONTRACT.md) —
+  End-to-end autonomous builder system prompt with template defaults
+
+---
+
+## Practical Recommendations
+
+1. **Pick one primary implementer for MVP** (e.g. Gemini CLI). Use the second
+   as a reviewer — it evaluates the PR diff and suggests fixes. Fewer conflicts.
+2. **Enforce small commits and mandatory tests.** The test/fix loop is the most
+   important safety net against vibe-coding.
+3. **OpenClaw must NOT be creative** — it is a pure process executor. If it
+   starts writing code or spec content, the architecture breaks.
+4. **Context passing:** Always send the full `context.json` to OpenClaw on each
+   turn. Do not rely on the model "remembering" — deterministic + auditable.
+5. **Treat the OpenClaw gateway as production SSH:** Keep on loopback / internal
+   Docker network. Token-protected. Never exposed publicly.
+6. **Winner selection heuristic:**
+   - Passing tests > failing tests
+   - More test files > fewer test files
+   - Cleaner README > sparse docs
+   - If both fail after 5 iterations → escalate to human
+7. **The Reviewer pattern** (alternative to dual-implementer): the winning
+   branch stays, the "losing" CLI reviews the PR diff and proposes fixes
+   into the winning branch. Fewer merge conflicts.
+
+---
+
+## Combined Mode (Single Endpoint)
+
+For simpler setups, OpenClaw can run REFINE → EXECUTE in one session.
+The n8n workflow sends messages to one endpoint; OpenClaw returns questions
+while in REFINE and switches to EXECUTE once locked.
+
+- **Endpoint:** `POST /webhook/janagi/spec/flow`
+- **Payload:** `{ "app_name": "...", "message": "...", "run_id": "..." }`
+- **REFINE response:** `{ "phase": "refine", "needs_input": true, "questions": [...] }`
+- **EXECUTE response:** `{ "phase": "execute", "status": "success", "pr_url": "..." }`
+
+See OPENCLAW_DISPATCHER_CONTRACT.md § 5 for the Combined system prompt.
 
 ---
 

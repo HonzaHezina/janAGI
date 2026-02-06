@@ -22,6 +22,7 @@ All workflow JSON files are in `ops/n8n/`.
 | `WF_11_Turbo_OpenClaw_UI_Operator.json` | OpenClaw PLAN/APPLY/VERIFY pattern |
 | `WF_12_Turbo_OpenClaw_Run_RawBody.json` | OpenClaw call with `JSON.stringify` body |
 | `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via REST API (OpenClaw generates JSON → n8n applies) |
+| `WF_30_SpecKit_Full_Build_Parallel.json` | Full Spec Kit build with parallel Gemini + Copilot implementers, winner selection, PR |
 
 ## Reusable Snippets
 

@@ -64,7 +64,7 @@ fi
 log "Bootstrapping Spec Kit..."
 git checkout -b base/spec-kit 2>/dev/null || git checkout base/spec-kit
 
-if [ ! -f "speckit.yaml" ] && [ ! -f ".speckit/config.yaml" ]; then
+if [ ! -d ".specify" ]; then
     # Assuming 'specify' is installed via uv tool or in path
     if command -v specify &> /dev/null; then
         specify init --here --ai gemini || true
@@ -74,7 +74,7 @@ if [ ! -f "speckit.yaml" ] && [ ! -f ".speckit/config.yaml" ]; then
         log "ERROR: 'specify' CLI not found. Skipping init."
     fi
 else
-    log "Spec Kit already initialized."
+    log "Spec Kit already initialized (.specify/ exists)."
 fi
 
 # 4. Agent Execution Function

@@ -1,0 +1,211 @@
+{
+  "name": "janAGI • SpecKit • Full Build (Parallel Implementers)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "janagi/spec-build",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "WebhookTrigger",
+      "name": "Webhook (Intent In)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 260]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json.body || $json;\nconst app_name = (body.app_name || `app-${Date.now()}`).toLowerCase().replace(/[^a-z0-9-]/g,'-');\nconst visibility = body.visibility || 'private';\nconst primary = body.primary || 'both';\nconst template = body.template || 'fastapi';\n\nreturn [{\n  app_name,\n  visibility,\n  primary,\n  template,\n  raw_intent: body.intent || '',\n  owner: process.env.GITHUB_OWNER,\n  work_root: process.env.WORK_ROOT || '/data/janagi-builds'\n}];"
+      },
+      "id": "Normalize",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 260]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nOWNER=\"{{$json.owner}}\"\nREPO=\"{{$json.app_name}}\"\nVIS=\"{{$json.visibility}}\"\nWORK_ROOT=\"{{$json.work_root}}\"\nTOKEN=\"${GITHUB_TOKEN}\"\n\nmkdir -p \"$WORK_ROOT\"\ncd \"$WORK_ROOT\"\n\nCREATE=$(curl -sS -o /tmp/create_repo.json -w \"%{http_code}\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"X-GitHub-Api-Version: 2022-11-28\" \\\n  -H \"Accept: application/vnd.github+json\" \\\n  https://api.github.com/user/repos \\\n  -d \"{\\\"name\\\":\\\"$REPO\\\",\\\"private\\\":$([ \"$VIS\" = \"private\" ] && echo true || echo false)}\") || true\n\nif [ \"$CREATE\" != \"201\" ] && [ \"$CREATE\" != \"422\" ]; then\n  echo \"Repo create failed (HTTP $CREATE)\" >&2\n  cat /tmp/create_repo.json >&2\n  exit 1\nfi\n\necho \"https://github.com/$OWNER/$REPO\"",
+        "options": {}
+      },
+      "id": "CreateRepo",
+      "name": "Create GitHub Repo",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [650, 260],
+      "notes": "Creates repo via GitHub API. Idempotent (ignores 422 = already exists)."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const repoUrl = ($json.stdout || '').trim();\nreturn [{\n  ...$json,\n  repo_url: repoUrl,\n  repo_clone: repoUrl.replace('https://github.com/', 'git@github.com:') + '.git',\n  workspace: `${$json.work_root}/${$json.app_name}`\n}];"
+      },
+      "id": "PreparePaths",
+      "name": "Prepare Paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 260]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nREPO_CLONE=\"{{$json.repo_clone}}\"\nWS=\"{{$json.workspace}}\"\n\nrm -rf \"$WS\"\ngit clone \"$REPO_CLONE\" \"$WS\"\ncd \"$WS\"\n\ngit checkout -b base/spec-kit\n\n# Spec Kit bootstrap (no spec content — CLI does that)\nspecify init --here --ai gemini || specify init --here --ai copilot\n\ngit add -A\ngit commit -m \"chore: initialize spec-kit\" || true\ngit push -u origin base/spec-kit\n\necho \"$WS\"",
+        "options": {}
+      },
+      "id": "SpecKitInit",
+      "name": "Spec Kit Init (base/spec-kit)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1110, 260],
+      "notes": "Bootstrap only — no spec/code content generated here."
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nWS=\"{{$json.stdout}}\"\ncd \"$WS\"\ngit checkout -b impl/gemini base/spec-kit\ngit push -u origin impl/gemini\necho \"impl/gemini\"",
+        "options": {}
+      },
+      "id": "BranchGemini",
+      "name": "Create Branch (impl/gemini)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1340, 160]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nWS=\"{{$node['Spec Kit Init (base/spec-kit)'].json.stdout}}\"\ncd \"$WS\"\ngit checkout -b impl/copilot base/spec-kit\ngit push -u origin impl/copilot\necho \"impl/copilot\"",
+        "options": {}
+      },
+      "id": "BranchCopilot",
+      "name": "Create Branch (impl/copilot)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1340, 360]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nWS=\"{{$node['Spec Kit Init (base/spec-kit)'].json.stdout}}\"\ncd \"$WS\"\ngit checkout impl/gemini\n\n# CLI Implementer runs the full Spec Kit flow\nif command -v openclaw &> /dev/null; then\n  timeout 600s openclaw agent --local \\\n    --profile \"${OPENCLAW_PROFILE_GEMINI:-google:default}\" \\\n    --session-id \"{{$json.app_name}}-gemini\" \\\n    --message \"You are CLI Implementer (Gemini). Follow Spec Kit flow: constitution→specify→plan→tasks→implement. Intent: {{$node['Normalize Input'].json.raw_intent}}. Template: {{$node['Normalize Input'].json.template}}. Commit small, run tests, fix until green (max 5 iterations).\" || true\nelse\n  echo 'openclaw not available — mock mode'\n  mkdir -p src && echo 'print(\"hello\")' > src/main.py\n  git add . && git commit -m 'feat: mock gemini impl'\nfi\n\ngit push\necho \"done\"",
+        "options": {}
+      },
+      "id": "RunGemini",
+      "name": "Run CLI Implementer (Gemini)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1580, 160]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nWS=\"{{$node['Spec Kit Init (base/spec-kit)'].json.stdout}}\"\ncd \"$WS\"\ngit checkout impl/copilot\n\nif command -v openclaw &> /dev/null; then\n  timeout 600s openclaw agent --local \\\n    --profile \"${OPENCLAW_PROFILE_COPILOT:-github:copilot}\" \\\n    --session-id \"{{$json.app_name}}-copilot\" \\\n    --message \"You are CLI Implementer (Copilot). Follow Spec Kit flow: constitution→specify→plan→tasks→implement. Intent: {{$node['Normalize Input'].json.raw_intent}}. Template: {{$node['Normalize Input'].json.template}}. Commit small, run tests, fix until green (max 5 iterations).\" || true\nelse\n  echo 'openclaw not available — mock mode'\n  mkdir -p src && echo 'print(\"hello copilot\")' > src/main.py\n  git add . && git commit -m 'feat: mock copilot impl'\nfi\n\ngit push\necho \"done\"",
+        "options": {}
+      },
+      "id": "RunCopilot",
+      "name": "Run CLI Implementer (Copilot)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1580, 360]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "MergeRuns",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [1820, 260]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nWS=\"{{$node['Spec Kit Init (base/spec-kit)'].json.stdout}}\"\ncd \"$WS\"\n\nscore_branch () {\n  local BR=\"$1\"\n  git checkout \"$BR\" >/dev/null 2>&1 || { echo \"0 0\"; return; }\n  local PASS=0\n  if [ -f pyproject.toml ]; then\n    (ruff check . >/dev/null 2>&1 && pytest -q >/dev/null 2>&1) && PASS=1 || PASS=0\n  elif [ -f package.json ]; then\n    (npm run lint >/dev/null 2>&1 && npm test >/dev/null 2>&1) && PASS=1 || PASS=0\n  fi\n  local TESTS=$(find . -maxdepth 4 -type f \\( -name 'test_*.py' -o -name '*.test.ts' -o -name '*.test.js' \\) 2>/dev/null | wc -l | tr -d ' ')\n  echo \"$PASS $TESTS\"\n}\n\nG=$(score_branch impl/gemini)\nC=$(score_branch impl/copilot)\n\necho \"gemini: $G\"\necho \"copilot: $C\"\n\nGPASS=$(echo $G | awk '{print $1}')\nGTEST=$(echo $G | awk '{print $2}')\nCPASS=$(echo $C | awk '{print $1}')\nCTEST=$(echo $C | awk '{print $2}')\n\nWIN=\"impl/gemini\"\nif [ \"$CPASS\" -gt \"$GPASS\" ]; then\n  WIN=\"impl/copilot\"\nelif [ \"$CPASS\" -eq \"$GPASS\" ] && [ \"$CTEST\" -gt \"$GTEST\" ]; then\n  WIN=\"impl/copilot\"\nfi\n\necho \"WINNER=$WIN\"",
+        "options": {}
+      },
+      "id": "PickWinner",
+      "name": "Pick Winner Branch",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2060, 260],
+      "notes": "Score heuristic: passing tests (2 pts) > test file count. Gemini wins on tie."
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "input": "-lc",
+        "args": "set -euo pipefail\nWS=\"{{$node['Spec Kit Init (base/spec-kit)'].json.stdout}}\"\nOWNER=\"{{$node['Normalize Input'].json.owner}}\"\nREPO=\"{{$node['Normalize Input'].json.app_name}}\"\n# Extract winner from last line\nWIN=$(echo '{{$node[\"Pick Winner Branch\"].json.stdout}}' | grep 'WINNER=' | cut -d= -f2)\n\ncd \"$WS\"\ngit checkout \"$WIN\"\n\n# Ensure main exists\nif ! git ls-remote --heads origin main | grep -q main; then\n  git checkout base/spec-kit\n  git checkout -b main\n  git push -u origin main\nfi\n\ngit checkout \"$WIN\"\n\nif command -v gh >/dev/null 2>&1; then\n  gh repo set-default \"$OWNER/$REPO\" >/dev/null 2>&1 || true\n  gh pr create \\\n    --base main \\\n    --head \"$WIN\" \\\n    --title \"SpecKit: implement $REPO ($WIN)\" \\\n    --body \"Automated Spec Kit build. Winner selected by test heuristics.\" \\\n    || true\nfi\n\necho \"PR attempted for $WIN\"",
+        "options": {}
+      },
+      "id": "CreatePR",
+      "name": "Create PR (Winner → main)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2290, 260]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{$json.stdout || $json}}",
+        "options": {}
+      },
+      "id": "WebhookResponse",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2520, 260]
+    }
+  ],
+  "connections": {
+    "Webhook (Intent In)": {
+      "main": [[{ "node": "Normalize Input", "type": "main", "index": 0 }]]
+    },
+    "Normalize Input": {
+      "main": [[{ "node": "Create GitHub Repo", "type": "main", "index": 0 }]]
+    },
+    "Create GitHub Repo": {
+      "main": [[{ "node": "Prepare Paths", "type": "main", "index": 0 }]]
+    },
+    "Prepare Paths": {
+      "main": [[{ "node": "Spec Kit Init (base/spec-kit)", "type": "main", "index": 0 }]]
+    },
+    "Spec Kit Init (base/spec-kit)": {
+      "main": [[
+        { "node": "Create Branch (impl/gemini)", "type": "main", "index": 0 },
+        { "node": "Create Branch (impl/copilot)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Create Branch (impl/gemini)": {
+      "main": [[{ "node": "Run CLI Implementer (Gemini)", "type": "main", "index": 0 }]]
+    },
+    "Create Branch (impl/copilot)": {
+      "main": [[{ "node": "Run CLI Implementer (Copilot)", "type": "main", "index": 0 }]]
+    },
+    "Run CLI Implementer (Gemini)": {
+      "main": [[{ "node": "Merge Results", "type": "main", "index": 0 }]]
+    },
+    "Run CLI Implementer (Copilot)": {
+      "main": [[{ "node": "Merge Results", "type": "main", "index": 1 }]]
+    },
+    "Merge Results": {
+      "main": [[{ "node": "Pick Winner Branch", "type": "main", "index": 0 }]]
+    },
+    "Pick Winner Branch": {
+      "main": [[{ "node": "Create PR (Winner → main)", "type": "main", "index": 0 }]]
+    },
+    "Create PR (Winner → main)": {
+      "main": [[{ "node": "Webhook Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "versionId": "1"
+}

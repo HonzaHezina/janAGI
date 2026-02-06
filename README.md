@@ -104,6 +104,7 @@ Full SQL: [`ops/infra/postgres/init/020_rag_schema.sql`](ops/infra/postgres/init
 | `WF_03_Analyst_Draft_and_Telegram_Approval.json` | Draft + Telegram approval gate |
 | `WF_10_Turbo_OpenClaw_Run.json` | Direct OpenClaw API call |
 | `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via API |
+| `WF_30_SpecKit_Full_Build_Parallel.json` | Full parallel build: Gemini + Copilot → winner → PR |
 
 Import instructions: [`ops/docs/WORKFLOWS.md`](ops/docs/WORKFLOWS.md)
 
@@ -154,6 +155,7 @@ janAGI/
 │   │   ├── MEMORY_ARCHITECTURE.md
 │   │   ├── DB_SCHEMA.md
 │   │   ├── OPENCLAW_DISPATCHER_CONTRACT.md
+│   │   ├── CLI_IMPLEMENTER_CONTRACT.md
 │   │   ├── OPENCLAW_TURBO.md
 │   │   ├── ACTION_DRAFT_PROTOCOL.md
 │   │   ├── SPECKIT_OPENCLAW_CLI.md
@@ -201,4 +203,5 @@ janAGI/
 - [ ] Live Telegram bot integration
 - [ ] Document ingestion pipeline (URLs, PDFs)
 - [ ] Spec-Kit full autopilot (end-to-end)
+- [ ] Parallel implementer builds (Gemini vs Copilot)
 - [ ] Dashboard UI (bolt.diy or custom)
