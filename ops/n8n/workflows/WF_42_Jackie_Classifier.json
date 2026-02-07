@@ -710,7 +710,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $('Start Run').item.json.conversation_id }}'::uuid,\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'n8n',\n  'ai_jackie',\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'assistant',\n    'text', to_jsonb('{{ $json.output ? $json.output.replace(/'/g, \"''\") : \"\" }}'::text),\n    'channel', 'telegram'\n  )\n) AS event_id;\n",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $('Start Run').item.json.conversation_id }}'::uuid,\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'n8n',\n  'ai_jackie',\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'assistant',\n    'text', to_jsonb('{{ ($json.output || $json.text || $json.result || \"\").toString().replace(/'/g, \"''\") }}'::text),\n    'channel', 'telegram'\n  )\n) AS event_id;\n",
         "options": {}
       },
       "id": "c42-logbot",
