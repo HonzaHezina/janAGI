@@ -1008,16 +1008,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Prepare Context').item.json.chat_id }}",
-        "text": "={{ (
-  $('Execute Web WF').first()?.json?.output ||
-  $('Execute Meeting WF').first()?.json?.output ||
-  $('Execute Task WF').first()?.json?.output ||
-  $('Execute Email WF').first()?.json?.output ||
-  $('Execute Chat WF').first()?.json?.output ||
-  $('Execute SpecKit WF').first()?.json?.output ||
-  $('Execute Clarify WF').first()?.json?.output ||
-  'Omlouvám se, něco se pokazilo.'
-) }}",
+        "text": "={{ ($('Execute Web WF').first()?.json?.output || $('Execute Meeting WF').first()?.json?.output || $('Execute Task WF').first()?.json?.output || $('Execute Email WF').first()?.json?.output || $('Execute Chat WF').first()?.json?.output || $('Execute SpecKit WF').first()?.json?.output || $('Execute Clarify WF').first()?.json?.output || 'Omlouvám se, něco se pokazilo.') }}",
         "additionalFields": {
           "appendAttribution": false,
           "parse_mode": "Markdown"
