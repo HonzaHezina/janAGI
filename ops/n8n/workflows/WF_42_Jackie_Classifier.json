@@ -19,8 +19,8 @@
       "typeVersion": 1,
       "credentials": {
         "telegramApi": {
-          "id": "BsEzRf2V5iDa2CvB",
-          "name": "Telegram account PN"
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
         }
       }
     },
@@ -104,8 +104,8 @@
       "typeVersion": 1.1,
       "credentials": {
         "telegramApi": {
-          "id": "BsEzRf2V5iDa2CvB",
-          "name": "Telegram account PN"
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
         }
       }
     },
@@ -255,8 +255,8 @@
       "typeVersion": 1.1,
       "credentials": {
         "telegramApi": {
-          "id": "BsEzRf2V5iDa2CvB",
-          "name": "Telegram account PN"
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
         }
       },
       "onError": "continueRegularOutput"
@@ -1034,8 +1034,8 @@
       "typeVersion": 1.1,
       "credentials": {
         "telegramApi": {
-          "id": "BsEzRf2V5iDa2CvB",
-          "name": "Telegram account PN"
+          "id": "BMu2dAqBS08BeSgB",
+          "name": "Telegram JH"
         }
       },
       "onError": "continueRegularOutput"
