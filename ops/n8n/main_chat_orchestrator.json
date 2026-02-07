@@ -184,7 +184,8 @@
     }
   ],
   "connections": {
-    "Telegram Trigger": { "main": [ [ { "node": "Log User Msg", "type": "main", "index": 0 } ] ] },
+    "Telegram Trigger": { "main": [ [ { "node": "Start Run", "type": "main", "index": 0 }, { "node": "Log User Msg", "type": "main", "index": 0 } ] ] },
+    "Start Run": { "main": [ [ { "node": "Memory Retrieval", "type": "main", "index": 0 } ] ] },
     "Log User Msg": { "main": [ [ { "node": "Memory Retrieval", "type": "main", "index": 0 } ] ] },
     "Memory Retrieval": { "main": [ [ { "node": "AI Agent (Router)", "type": "main", "index": 0 } ] ] },
     "AI Agent (Router)": { "main": [ [ { "node": "Parse Actions", "type": "main", "index": 0 } ] ] },
