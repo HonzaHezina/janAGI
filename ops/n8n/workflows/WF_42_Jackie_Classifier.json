@@ -44,7 +44,6 @@
         },
         "options": {}
       },
-      "id": "7a8b9cde-1111-2222-3333-444455556666",
       "name": "Voice or Text",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -357,7 +356,7 @@
           ]
         },
         "options": {
-          "systemPromptTemplate": "You are a STRICT intent classifier for the Jackie AI system.\n\nIMPORTANT: You have NO tools. Do NOT call any tools. Do NOT include tool calls, markdown, code fences, or extra text.\n\nTask: Read the Input Text and choose exactly ONE category from: {categories}. Respond with JSON ONLY, exactly in this form: {\"category\": \"<CATEGORY>\"}.\n\nAllowed values for <CATEGORY>: UNKNOWN, MEETING, TASK, EMAIL, CHAT, WEB, DEV.\n\nGuidelines (tie-breakers):\n- MEETING: calendar events, scheduling, availability, invitations, dates/times.\n- TASK: todos/reminders, deadlines, 'připomeň', 'úkol'.\n- EMAIL: read/search/reply/send emails, Gmail, mail/pošta.\n- WEB: browse/search current info, verify something on a website, extract from URL.\n- DEV: programming, repo changes, builds/tests, spec-kit.\n- CHAT: general questions, explanation, summary, advice; no external tools required.\n- UNKNOWN: unclear or mixed intent.\n\nIf you cannot confidently choose a category, output {\"category\": \"UNKNOWN\"}."
+          "systemPromptTemplate": "You are a STRICT intent classifier for the Jackie AI system.\n\nIMPORTANT: You have NO tools. Do NOT call any tools. Do NOT include tool calls, markdown, code fences, or extra text.\n"
         }
       },
       "onError": "continueRegularOutput"
