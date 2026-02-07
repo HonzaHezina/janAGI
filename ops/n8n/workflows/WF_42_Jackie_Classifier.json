@@ -249,7 +249,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Voice or Text').item.json.chat_id }}",
-        "text": "OK, pracuju na tom.",
+        "text": "👌 Prijato, pracuju na tom.",
         "additionalFields": {
           "appendAttribution": false
         }
