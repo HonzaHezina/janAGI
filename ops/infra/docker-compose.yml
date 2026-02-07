@@ -1,11 +1,22 @@
 # janAGI Docker Stack
 # Deploy via Coolify or `docker compose up -d`
-# NOTE: In Coolify, the Postgres hostname becomes `postgresql` (managed by Coolify).
-#       When running standalone, the hostname is `postgres` (the service name below).
+#
+# COOLIFY HOSTNAME CONVENTION:
+#   Rename resources in Coolify to short names: n8n, openclaw, mindsdb, janagi-db
+#   Coolify uses the resource name as the internal Docker hostname.
+#
+# DATABASE SEPARATION:
+#   - postgres service hosts TWO databases:
+#     1) 'n8n' — n8n internal state (workflows, credentials, executions)
+#     2) 'janagi' — domain data (rag.*, analytics.*)
+#   - n8n connects to 'n8n' DB for its own state
+#   - n8n Postgres nodes connect to 'janagi' DB for business data
+#   - MindsDB connects to 'janagi' DB as read-only
 
 services:
   postgres:
     image: pgvector/pgvector:0.8.0-pg16
+    # In Coolify, rename this resource to "janagi-db" for stable hostname
     restart: unless-stopped
     env_file: .env
     environment:
@@ -67,8 +78,24 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
+  # OpenClaw / Jackie — AI agent with browser/CLI tools
+  # INTERNAL ONLY: no public ports exposed. Always require auth token.
+  # In Coolify, rename this resource to "openclaw" for stable hostname.
+  # openclaw:
+  #   image: openclaw/openclaw:latest
+  #   restart: unless-stopped
+  #   environment:
+  #     TZ: ${TZ:-Europe/Prague}
+  #     OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+  #   # NO ports: section — internal-only, reached via http://openclaw:18789
+  #   # If you must expose for debugging: use 127.0.0.1:18789:18789 (loopback only)
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+
   # MindsDB — batch analytics, lead scoring, trend detection
   # Connects to Postgres as read-only data source, writes to analytics.* schema
+  # In Coolify, rename this resource to "mindsdb" for stable hostname.
   mindsdb:
     image: mindsdb/mindsdb:latest
     restart: unless-stopped

@@ -135,14 +135,29 @@ In n8n UI: **Workflows → Import from File** — import the JSON files from `op
 
 ## Networking (Coolify / Docker)
 
-Inside the Docker stack, services reach each other by service name:
-- n8n → Postgres: `postgresql:5432` (Coolify managed)
+All services communicate via internal Docker DNS using **stable hostnames**.
+Rename Coolify resources to short names for predictable DNS.
+
+| Service | Hostname | Port | Exposed? |
+|---------|----------|------|----------|
+| PostgreSQL | `janagi-db` | 5432 | ❌ No |
+| n8n | `n8n` | 5678 | ✅ Webhooks (HTTPS) |
+| OpenClaw | `openclaw` | 18789 | ❌ No (internal-only) |
+| MindsDB | `mindsdb` | 47335 | ❌ No |
+
+Internal routes:
+- n8n → janagi DB: `janagi-db:5432`
 - n8n → OpenClaw: `http://openclaw:18789`
 - n8n → MindsDB: `mindsdb:47335` (MySQL API)
 - OpenClaw → n8n: `http://n8n:5678`
-- MindsDB → Postgres: `postgres:5432` (read-only)
+- MindsDB → janagi DB: `janagi-db:5432` (read-only)
 
 **Never use `localhost` or `127.0.0.1`** between containers.
+
+Verify DNS from any container:
+```bash
+getent hosts openclaw && ping -c 1 openclaw
+```
 
 See: [`ops/docs/COOLIFY_EXISTING_RESOURCES.md`](ops/docs/COOLIFY_EXISTING_RESOURCES.md)
 
@@ -195,7 +210,8 @@ janAGI/
 
 - All secrets via Coolify environment variables (never committed)
 - Action Draft protocol requires human approval for destructive actions
-- OpenClaw gateway protected by token
+- OpenClaw is **internal-only** (no public ports) and protected by auth token
+- Separate databases: n8n internal vs. janAGI business data
 - See [`ops/docs/SECURITY.md`](ops/docs/SECURITY.md)
 
 ---

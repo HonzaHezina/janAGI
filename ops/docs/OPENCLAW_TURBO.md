@@ -66,8 +66,9 @@ Recommended env vars (Coolify secrets):
 ```
 
 Notes:
-- Use `user` for stable session routing.
+- Use `user` for stable session routing. This is a **killer feature**: OpenClaw derives a stable session key from `user`, so multi-step tasks maintain continuity. Use a predictable format like `telegram:<chat_id>` or `n8n:<workflow_id>`.
 - If you omit `x-openclaw-agent-id`, routing still works via `model` (`openclaw:<agentId>`).
+- You can target specific agents per task: `"model": "openclaw:ui-operator"` for UI tasks, `"model": "openclaw:main"` for general reasoning.
 
 ---
 
@@ -133,3 +134,86 @@ Upstream provider rate limiting.
 - retry/backoff in n8n
 - reduce concurrency
 - use smaller model for routing, big model only for execution
+
+---
+
+## 7) UI Operator Protocol (PLAN → APPLY → VERIFY)
+
+When using OpenClaw to operate on UIs (n8n editor, MindsDB, dashboards, admin panels),
+follow this three-phase protocol to avoid fragile automation:
+
+### Phase 1: PLAN
+
+OpenClaw analyzes the task and returns:
+- Step-by-step actions it will perform
+- How it will verify success
+- What artifacts it will export as proof (workflow JSON, screenshot, etc.)
+
+```json
+{
+  "model": "openclaw:main",
+  "user": "n8n:ui-operator",
+  "input": "Open n8n UI at http://n8n:5678. I need a new workflow that triggers on Telegram message, calls OpenClaw, and replies. First, tell me your PLAN: what steps you'll take, how you'll verify, and what you'll export. Do NOT make changes yet."
+}
+```
+
+### Phase 2: APPLY
+
+After reviewing the plan, trigger execution:
+
+```json
+{
+  "model": "openclaw:main",
+  "user": "n8n:ui-operator",
+  "input": "Approved. Execute the plan now. Create the workflow in n8n. Report each step as you complete it."
+}
+```
+
+### Phase 3: VERIFY
+
+OpenClaw re-opens the UI and confirms the end-state:
+
+```json
+{
+  "model": "openclaw:main",
+  "user": "n8n:ui-operator",
+  "input": "Verify the workflow was created correctly. Open n8n, check the workflow exists, nodes are connected, credentials are set. Export the workflow JSON as proof."
+}
+```
+
+### n8n Integration Pattern
+
+In n8n, wire it as a sub-workflow with a Telegram approval gate:
+
+1. **PLAN call** → Parse response → Send plan summary to Telegram
+2. User clicks "✅ Schválit" → Trigger APPLY
+3. **APPLY call** → Parse response → Log result
+4. **VERIFY call** → Parse response → Send verification + exported artifact to Telegram
+5. User clicks "✅ Aktivovat" → Activate the workflow / deploy the change
+
+See workflow templates:
+- `WF_11_Turbo_OpenClaw_UI_Operator.json` — PLAN/APPLY/VERIFY pattern
+- `WF_40_Jackie_Telegram_Assistant.json` — Main assistant with ACTION_DRAFT
+- `WF_41_Jackie_Action_Subflow.json` — Approved action executor
+
+---
+
+## 8) OpenClaw as a Skill/Tool in the Main Assistant
+
+OpenClaw can be attached to the main Jackie assistant in two ways:
+
+### A) Direct HTTP Tool (in the AI Agent node)
+Add an HTTP Request tool in n8n's AI Agent node that calls `/v1/responses`.
+The agent decides autonomously when to invoke OpenClaw.
+
+**Pro:** Simple, no extra workflow.
+**Con:** No human approval gate for dangerous actions.
+
+### B) Separate Sub-workflow via ACTION_DRAFT (recommended)
+The main agent outputs `[ACTION_DRAFT]` + JSON when it needs OpenClaw.
+n8n routes it to Telegram for approval, then executes via `WF_41`.
+
+**Pro:** Human-in-the-loop, full audit trail.
+**Con:** Extra latency (waiting for approval).
+
+Choose **B** for production, **A** for development/testing.

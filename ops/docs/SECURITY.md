@@ -16,10 +16,12 @@ Set `N8N_ENCRYPTION_KEY` from day 1 and never change it unless you intentionally
 ## OpenClaw hardening essentials
 OpenClaw stores sensitive state under `~/.openclaw/` (config, credentials, sessions, transcripts). If you deploy it:
 
-- **Auth required:** always configure token/password auth.
-- **Network exposure:** prefer internal-only networking; do not publish the raw port publicly.
-- **Least privilege:** use dedicated agents with strict tool allowlists.
-- **Rotate secrets:** if compromised, rotate OpenClaw token/password and provider creds.
+- **Internal-only networking:** OpenClaw must NOT have public ports. Keep it internal (`http://openclaw:18789`) behind the Docker network. If you must expose for debugging, bind only to loopback: `127.0.0.1:18789:18789`.
+- **Auth required:** Always configure token/password auth (`OPENCLAW_GATEWAY_TOKEN`).
+- **Least privilege:** Use dedicated agents with strict tool allowlists (e.g., `ui-operator` agent with only browser tools, no CLI).
+- **Rotate secrets:** If compromised, rotate OpenClaw token/password and all provider credentials immediately.
+- **Endpoint control:** `/v1/responses` and `/v1/chat/completions` are disabled by default. Only enable what you need.
+- **Session isolation:** Use `user` field in requests for stable session keys. Never share sessions between users/workflows.
 
 ## Data retention
 Leads/messages can include personal data. Add a retention policy (e.g., delete/anon after 30–90 days) if needed.

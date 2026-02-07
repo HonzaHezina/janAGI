@@ -7,8 +7,21 @@ with long-term memory, project management capabilities, and safe action executio
 ## Components
 
 ### PostgreSQL + pgvector (Data Layer)
-Single database hosting all schemas:
+
+**Two logical databases on one Postgres instance:**
+
+| Database | Owner | Purpose |
+|----------|-------|---------|
+| `n8n` | `n8n` | n8n internal state (workflows, credentials, executions) — **never put business data here** |
+| `janagi` | `janagi` | Domain data: `rag.*` (events, memory, RAG), `analytics.*` (scores, trends) |
+
+> **Why separate?** n8n upgrades can migrate its own DB schema. If your business data
+> is in the same DB, a bad n8n migration could lock or corrupt your data. Keeping them
+> apart means n8n and janAGI can evolve independently.
+
+Schemas in `janagi` DB:
 - `rag.*` — Core operational data: clients, projects, conversations, runs, events, artifacts, and the RAG vector store (sources → documents → chunks with HNSW index).
+- `analytics.*` — MindsDB-written batch results: lead scores, daily trends.
 
 Extensions: `vector`, `pgcrypto`, `pg_trgm`, `unaccent`.
 
@@ -42,7 +55,24 @@ AI reasoning engine with optional browser/CLI tools:
 - **Handles all operational work** the human would otherwise do manually:
   repo creation, Spec Kit bootstrap, branch management, CLI invocation, PR creation
 - **Workflow Builder**: generates n8n workflow JSON and creates workflows via n8n API
+- **UI Operator**: can open n8n/other UIs via browser tools (PLAN → APPLY → VERIFY protocol)
 - Connects to n8n via `http://n8n:5678` (internal Docker DNS)
+- ⚠️ **Internal-only** — no public ports; always behind auth token
+
+#### UI Operator Protocol (PLAN → APPLY → VERIFY)
+
+When OpenClaw operates on a UI (n8n editor, MindsDB, dashboards):
+
+1. **PLAN** — OpenClaw returns what it will do step-by-step, how it verifies success, and what artifacts it exports
+2. **APPLY** — Performs the actual UI changes (clicks, fills, submits)
+3. **VERIFY** — Re-opens the UI, confirms the end-state matches expectations, exports proof (workflow JSON, screenshot, etc.)
+
+In n8n, add a gate after VERIFY:
+- User gets a Telegram report + exported artifact
+- One-click "✅ Approve" to activate/deploy the result
+- Until approved, the change is staged but not live
+
+See [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) for HTTP call shapes.
 
 ### MindsDB (Analytics Layer)
 Batch analytics engine — does **not** interfere with live chat:
@@ -90,16 +120,48 @@ sequenceDiagram
 
 ## Networking (Coolify Docker Stack)
 
-All services communicate via internal Docker DNS:
+All services communicate via internal Docker DNS. **No service should be reachable publicly
+except n8n webhooks** (which Coolify proxies via HTTPS).
+
+### Stable Hostnames (Recommended Coolify Resource Names)
+
+| Resource Name | Internal Hostname | Exposed Publicly? |
+|---------------|-------------------|-------------------|
+| `janagi-db` | `janagi-db` | ❌ No |
+| `n8n` | `n8n` | ✅ Yes (webhooks via Coolify proxy) |
+| `openclaw` | `openclaw` | ❌ No (internal-only, auth required) |
+| `mindsdb` | `mindsdb` | ❌ No (or admin-only) |
+
+> **Tip:** Rename Coolify resources to short names. Coolify uses the resource name
+> as the container hostname. Random suffixes like `mindsdb-wc88...` work but are painful to debug.
+
+### Internal DNS Routes
 
 | From | To | URL |
 |------|----|-----|
-| n8n | Postgres | `postgresql:5432` |
+| n8n | janagi DB | `janagi-db:5432` |
 | n8n | OpenClaw | `http://openclaw:18789` |
 | n8n | MindsDB | `mindsdb:47335` (MySQL API) |
 | OpenClaw | n8n | `http://n8n:5678` |
 | OpenClaw | n8n API | `http://n8n:5678/api/v1/` |
-| MindsDB | Postgres | `postgres:5432` (read-only) |
+| MindsDB | janagi DB | `janagi-db:5432` (read-only) |
+
+> `postgresql` hostname (Coolify-managed Postgres) is used for **n8n's own internal DB**.
+> `janagi-db` is the **domain/business database**. They can be the same Postgres instance
+> with two databases, or two separate instances.
+
+### Verify DNS from Inside a Container
+
+```bash
+# In Coolify: open Terminal for the n8n container, then:
+getent hosts openclaw
+getent hosts mindsdb
+getent hosts janagi-db
+ping -c 1 openclaw
+```
+
+If DNS doesn't resolve, the services are not in the same Docker network
+or the resource name doesn't match. Fix in Coolify → Settings → Networks.
 
 **Important**: Never use `localhost` between containers. Coolify manages the network.
 
@@ -107,3 +169,29 @@ All services communicate via internal Docker DNS:
 - Every piece of data is scoped to `client_id` + `project_id`
 - Default client: `janagi`, default project: `janagi`
 - New tenants = new rows in `rag.clients` / `rag.projects`
+
+## Agent Architecture Pattern
+
+The system follows a **"one main assistant + specialized sub-workflows"** pattern:
+
+```
+┌──────────────────────────────────────────────┐
+│              Jackie (Main Assistant)          │
+│  Telegram ↔ AI Agent ↔ History ↔ Memory      │
+│                                              │
+│  Decides: answer directly OR delegate        │
+├──────────────┬───────────────┬───────────────┤
+│ Sub-WF: Web  │ Sub-WF: Spec  │ Sub-WF: WF    │
+│ (OpenClaw    │ (Spec-Kit     │ (Workflow      │
+│  fetch/      │  build/       │  Builder via   │
+│  browse)     │  implement)   │  n8n API)      │
+├──────────────┼───────────────┼───────────────┤
+│ Sub-WF:      │ Sub-WF:       │ Sub-WF:        │
+│ Email/Tasks  │ CLI Repair    │ Analytics      │
+│ (disabled)   │               │ (MindsDB read) │
+└──────────────┴───────────────┴───────────────┘
+```
+
+OpenClaw is connected as a **skill/tool** — either:
+- Directly in the main agent as an HTTP tool call, or
+- As a separate sub-workflow (`WF_41`) that the main agent triggers via ACTION_DRAFT
