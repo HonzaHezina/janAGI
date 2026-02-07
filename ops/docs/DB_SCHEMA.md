@@ -53,7 +53,7 @@
 
 | Value | Source | Description |
 |-------|--------|-------------|
-| `'chat'` | WF_40 | Normal Telegram conversation |
+| `'chat'` | WF_42/46 | Normal Telegram conversation (Router/Chat) |
 | `'web_fetch'` | WF_41 | OpenClaw web fetch sub-run |
 | `'web_search'` | WF_41 | OpenClaw web search sub-run |
 | `'web_browser'` | WF_41 | OpenClaw browser sub-run |
@@ -72,7 +72,7 @@
 | Name | Table | Columns | Type | Purpose |
 |------|-------|---------|------|---------|
 | `idx_chunks_embedding_hnsw` | `rag.chunks` | `embedding` | HNSW (`vector_cosine_ops`) | Semantic search |
-| `idx_events_conv_type_ts` | `rag.events` | `(conversation_id, event_type, ts DESC)` | B-tree | Load history (WF_40) |
+| `idx_events_conv_type_ts` | `rag.events` | `(conversation_id, event_type, ts DESC)` | B-tree | Load history (WF_42/46) |
 | `idx_events_type_name` | `rag.events` | `(event_type, name)` | B-tree | Action draft lookup (WF_41) |
 | `idx_events_run_id` | `rag.events` | `(run_id, ts)` | B-tree | Run timeline |
 | `idx_runs_conversation` | `rag.runs` | `(conversation_id, started_at DESC)` | B-tree | Conversation runs |
@@ -84,8 +84,8 @@
 
 | Function | Signature | Returns | Used By |
 |----------|-----------|---------|---------|
-| `rag.start_run_for_thread` | `(client_id, project_id, channel, thread_key, kind, title, run_meta, conv_meta)` | `(conversation_id uuid, run_id uuid, is_new_conversation bool)` | WF_40, WF_41 |
-| `rag.log_event` | `(client_id, project_id, conversation_id, run_id, actor_type, actor_name, event_type, name, payload)` | `uuid` (event_id) | WF_40, WF_41 |
+| `rag.start_run_for_thread` | `(client_id, project_id, channel, thread_key, kind, title, run_meta, conv_meta)` | `(conversation_id uuid, run_id uuid, is_new_conversation bool)` | WF_42, WF_41 |
+| `rag.log_event` | `(client_id, project_id, conversation_id, run_id, actor_type, actor_name, event_type, name, payload)` | `uuid` (event_id) | WF_42, WF_41 |
 | `rag.finish_run` | `(run_id, status, summary, metadata)` | `void` | WF_41 |
 | `rag.search_chunks` | `(project_key, embedding, threshold, count)` | `(id, content, similarity, metadata)` | memory_workflows |
 
@@ -138,7 +138,7 @@ ROLE mindsdb_ro  -- LOGIN, password in env var MINDSDB_PG_PASSWORD
 
 All SQL templates: [`ops/n8n/sql/RAG_POSTGRES_NODES.sql`](../n8n/sql/RAG_POSTGRES_NODES.sql)
 
-Common pattern (from WF_40):
+Common pattern (from WF_42):
 ```sql
 -- Start a run
 SELECT * FROM rag.start_run_for_thread(

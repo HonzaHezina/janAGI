@@ -34,9 +34,9 @@ Telegram Trigger → (voice?) Transcribe → AI Agent
 → Router:
 - if LLM can answer directly → reply
 - if tool needed → call tool (Gmail, Calendar, DB…)
-- if web task needed → call **OpenClaw** (browse, scrape, social media)
-- if project build → call **OpenClaw** (Spec Kit spec-driven dev + GitHub)
-- if workflow needed → call **OpenClaw** (Workflow Builder)
+- if web task needed → call **WF_48** (Web Interface) → OpenClaw
+- if project build → call **WF_49** (Spec Kit Interface) → OpenClaw
+- if workflow needed → call **WF_20** (Workflow Builder)
 
 Router note (WF_42): when using the classifier/dispatcher path, categories map to MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48, DEV→WF_49, UNKNOWN→WF_47. WF_42 sends an ACK first, waits for the subflow result, logs, then replies.
 

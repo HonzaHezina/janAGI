@@ -200,7 +200,7 @@ In n8n, wire it as a sub-workflow with a Telegram approval gate:
 
 See workflow templates:
 - `WF_11_Turbo_OpenClaw_UI_Operator.json` — PLAN/APPLY/VERIFY pattern
-- `WF_40_Jackie_Telegram_Assistant.json` — Main assistant with ACTION_DRAFT
+- `WF_42_Jackie_Classifier.json` — Main assistant entry point (Router)
 - `WF_41_Jackie_Action_Subflow.json` — Approved action executor
 
 ---
@@ -229,4 +229,4 @@ Choose **B** for production, **A** for development/testing.
 
 - WF_42 is the Telegram-facing classifier/dispatcher with an early ACK and `waitForSubWorkflow=true` on Execute Workflow nodes.
 - Category map: MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48 (OpenClaw web), DEV→WF_49 (SpecKit webhook), UNKNOWN→WF_47.
-- If you want approvals before Turbo calls, keep the Action Draft path (WF_40/41) in front of WF_42 or add approval gates inside subflows.
+- If you want approvals before Turbo calls, keep the Action Draft path (WF_42/41) in front of WF_42 or add approval gates inside subflows.

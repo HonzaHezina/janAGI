@@ -58,7 +58,6 @@ Functions as the traffic controller. It delegates intelligence to OpenClaw.
 **Core Workflows (V2 Router):**
 
 1.  **Ingestion & Routing**
-    *   **Ingest** (`WF_01`): Standardizes inputs.
     *   **Router / Brain** (`WF_42_Jackie_Classifier`): The entry point. Classifies intent and routes to handlers.
 
 2.  **Specialized Handlers (The "Limbs")**

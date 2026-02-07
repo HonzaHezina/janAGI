@@ -32,7 +32,7 @@ Leads/messages can include personal data. Add a retention policy (e.g., delete/a
 - Consider a dedicated `ui-operator` agent with strict tool allowlist and a separate session key.
 
 ## Credential map for Jackie router/subflows
-- Telegram bot token — WF_40/WF_42 triggers and replies
+- Telegram bot token — WF_42 triggers and replies
 - Postgres (`rag.*`) — logging runs/events/artifacts
 - Google Calendar/Tasks/Gmail creds — WF_43/44/45
 - OpenClaw bearer (`OPENCLAW_GATEWAY_TOKEN`) — WF_10/11/12/41/48 and any Turbo calls

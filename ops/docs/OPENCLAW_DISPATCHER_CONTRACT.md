@@ -28,6 +28,11 @@ and PR creation.
 4. **Evaluate & Ship** — checks validation commands, picks winner, runs fix-loop
    if needed, opens PR.
 
+**Implementation Note (Brain vs Hands):**
+In janAGI, this workload is split across two n8n workflows:
+- **WF_49 (Interface):** Handles Step 1 (Refine & Lock). It's the "Brain" that talks to the user.
+- **WF_30 (Engine):** Handles Steps 2–4 (Bootstrap, Invoke, Ship). It's the "Hands" that execute the build.
+
 **Hard constraints:**
 - You **DO NOT** generate Spec Kit artifacts (constitution, spec, plans) yourself.
 - You **DO NOT** write application code yourself.
@@ -261,7 +266,7 @@ See: [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md)
 - Classifier categories → subflows: MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48, DEV→WF_49, UNKNOWN→WF_47.
 - Inputs passed to subflows: `text`, `chat_id`, `conversation_id`, `run_id`. Subflows should return `{ output: "..." }` for Telegram Reply.
 - WorkflowIds must be set in WF_42 after import; keep the ACK node enabled for async UX.
-- Safety posture: for mutating actions (calendar/task/email/web/spec build/UI ops), prefer Action Draft via WF_40/41 or an explicit approval step inside the subflow.
+- Safety posture: for mutating actions (calendar/task/email/web/spec build/UI ops), prefer Action Draft via WF_42/41 or an explicit approval step inside the subflow.
 
 ---
 
