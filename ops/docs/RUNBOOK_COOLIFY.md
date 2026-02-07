@@ -46,8 +46,11 @@ In n8n Credentials:
 
 ## Backup
 ```bash
-# Database
-docker exec <postgres-container> pg_dump -U n8n -d n8n > backup_$(date +%F).sql
+# janagi business database (rag.* + analytics.*)
+docker exec <postgres-container> pg_dump -U janagi -d janagi > janagi_backup_$(date +%F).sql
+
+# n8n internal database (optional — Coolify only, if using separate n8n DB)
+docker exec <postgres-container> pg_dump -U n8n -d n8n > n8n_backup_$(date +%F).sql
 
 # n8n workflows (via API)
 curl -H "X-N8N-API-KEY: $KEY" https://your-domain.com/api/v1/workflows > workflows_backup.json

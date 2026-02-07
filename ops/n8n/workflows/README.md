@@ -5,19 +5,31 @@ Import these JSON files in n8n:
 
 ## Workflow Index
 
+### Live Workflows
+
 | File | Purpose |
 |------|---------|
-| `WF_01_Ingest_Message.json` | Ingest & embed a message into RAG |
-| `WF_02_Hunter_Run.json` | Scheduled data collection |
-| `WF_03_Analyst_Draft_and_Telegram_Approval.json` | Draft + Telegram approval gate |
-| `WF_04_Executor_On_Approve.json` | Execute on Telegram callback approval |
+| `WF_40_Jackie_Telegram_Assistant.json` | **LIVE** — Main Jackie AI assistant (Telegram → AI → ACTION_DRAFT / reply) |
+| `WF_41_Jackie_Action_Subflow.json` | **LIVE** — Approved action executor (callback → OpenClaw → artifact → reply) |
+
+### Active Templates
+
+| File | Purpose |
+|------|---------|
 | `WF_10_Turbo_OpenClaw_Run.json` | Direct OpenClaw API call |
 | `WF_11_Turbo_OpenClaw_UI_Operator.json` | OpenClaw PLAN/APPLY/VERIFY pattern |
 | `WF_12_Turbo_OpenClaw_Run_RawBody.json` | OpenClaw call with raw JSON body |
 | `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via REST API |
 | `WF_30_SpecKit_Full_Build_Parallel.json` | Full Spec Kit parallel build |
-| `WF_40_Jackie_Telegram_Assistant.json` | Main Jackie AI assistant (Telegram → AI → ACTION_DRAFT / reply) |
-| `WF_41_Jackie_Action_Subflow.json` | Approved action executor (callback → OpenClaw → artifact → reply) |
+
+### Legacy (Superseded)
+
+| File | Status | Superseded By |
+|------|--------|---------------|
+| `WF_01_Ingest_Message.json` | ⚠️ Skeleton | `memory_workflows.json` |
+| `WF_02_Hunter_Run.json` | ⚠️ Skeleton (old "Hunter" concept) | OpenClaw web browsing via WF_41 |
+| `WF_03_Analyst_Draft_and_Telegram_Approval.json` | ⚠️ Skeleton (old "Analyst" concept) | WF_40 AI Jackie agent |
+| `WF_04_Executor_On_Approve.json` | ⚠️ Skeleton | WF_41 |
 
 ## WF_40 + WF_41: Jackie Assistant Pair
 

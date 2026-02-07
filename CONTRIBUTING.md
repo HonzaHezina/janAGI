@@ -1,7 +1,11 @@
 # Contributing
 
 ## Project Context
-janAGI is an autonomous personal AI agent (Jackie) built on n8n + PostgreSQL/pgvector + OpenClaw.
+janAGI is an autonomous personal AI agent (Jackie) built on
+[n8n](https://github.com/n8n-io/n8n) (fair-code workflow automation) +
+PostgreSQL/pgvector + [OpenClaw](https://docs.openclaw.ai/) (AI agent gateway) +
+[MindsDB](https://github.com/mindsdb/mindsdb) (Federated Query Engine for AI) +
+[Spec Kit](https://github.com/github/spec-kit) (spec-driven development toolkit).
 All operational code lives in `ops/`.
 
 ## Rules
@@ -17,7 +21,7 @@ All operational code lives in `ops/`.
 - n8n workflow exports → `ops/n8n/` (core) or `ops/n8n/workflows/` (templates)
 - Reusable code snippets → `ops/n8n/snippets/` (JS) and `ops/n8n/sql/` (SQL)
 - Shell scripts → `ops/scripts/`
-- Microservices → `ops/services/`
+- Services → `ops/services/` (legacy stubs — web scraping now handled by OpenClaw)
 
 ## Commit Style
 - `feat: ...` — New feature

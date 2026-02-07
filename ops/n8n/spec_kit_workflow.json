@@ -57,7 +57,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/chat/completions",
+        "url": "={{$env.OPENCLAW_BASE_URL}}/v1/responses",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -72,7 +72,7 @@
         "sendBody": true,
         "contentType": "json",
         "jsonParameters": true,
-        "bodyParametersJson": "={{JSON.stringify({\n  model: 'openclaw:main',\n  temperature: 0.2,\n  messages: [\n    {\n      role: 'system',\n      content: [\n        'You are OpenClaw Dispatcher in REFINE mode for GitHub Spec Kit.',\n        'You must ask ONLY the minimum questions so a CLI implementer can create: constitution, specification, plan, tasks, and implement.',\n        'You KNOW the Spec Kit flow (constitution → specify → plan → tasks → implement) and gather inputs for:',\n        '  [Repo]: Owner, Name, Visibility, Primary implementer (gemini/copilot/both)',\n        '  [Constitution]: Constraints (Testing? Strict lint? Minimal deps? Security?)',\n        '  [Spec]: Product Goal (1 sentence), Target User, Acceptance Criteria (3-7), Non-goals',\n        '  [Plan]: Stack (FastAPI/Next.js/Fullstack), Deploy target, Auth model, Data/storage',\n        '  [Validation]: Exact commands to verify (e.g. pytest && ruff check .)',\n        'DO NOT create repo, run commands, or write spec/plan/tasks. Only refine.',\n        'Max 2-3 questions per turn. Always provide sensible defaults.',\n        'Return ONLY JSON: {phase:refine, run_id, needs_input, questions:[{key,q,default}], defaults, summary_so_far, locked (only when needs_input=false)}',\n        'locked MUST contain: project_intent, definition_of_done, non_goals, validation_commands, risk_notes, repo_params{owner,name,visibility}, primary_mode, template, constitution_constraints'\n      ].join('\\n')\n    },\n    {\n      role: 'user',\n      content: JSON.stringify({\n        run_id: $node['Context'].json.run_id,\n        app_name: $node['Context'].json.app_name,\n        github_owner: $node['Context'].json.github_owner,\n        defaults: $node['Context'].json.defaults,\n        current_message: $node['Context'].json.user_message,\n        context_path: $node['Context'].json.run_dir + '/context.json'\n      })\n    }\n  ]\n})}}"
+        "bodyParametersJson": "={{JSON.stringify({\n  model: 'openclaw:main',\n  temperature: 0.2,\n  input: [\n    {\n      role: 'system',\n      content: [\n        'You are the Spec Kit Refiner running in OpenClaw (a self-hosted AI agent gateway).',\n        'You must ask ONLY the minimum questions so a CLI implementer can create: constitution, specification, plan, tasks, and implement.',\n        'You KNOW the Spec Kit flow (constitution → specify → plan → tasks → implement) and gather inputs for:',\n        '  [Repo]: Owner, Name, Visibility, Primary implementer (gemini/copilot/both)',\n        '  [Constitution]: Constraints (Testing? Strict lint? Minimal deps? Security?)',\n        '  [Spec]: Product Goal (1 sentence), Target User, Acceptance Criteria (3-7), Non-goals',\n        '  [Plan]: Stack (FastAPI/Next.js/Fullstack), Deploy target, Auth model, Data/storage',\n        '  [Validation]: Exact commands to verify (e.g. pytest && ruff check .)',\n        'DO NOT create repo, run commands, or write spec/plan/tasks. Only refine.',\n        'Max 2-3 questions per turn. Always provide sensible defaults.',\n        'Return ONLY JSON: {phase:refine, run_id, needs_input, questions:[{key,q,default}], defaults, summary_so_far, locked (only when needs_input=false)}',\n        'locked MUST contain: project_intent, definition_of_done, non_goals, validation_commands, risk_notes, repo_params{owner,name,visibility}, primary_mode, template, constitution_constraints'\n      ].join('\\n')\n    },\n    {\n      role: 'user',\n      content: JSON.stringify({\n        run_id: $node['Context'].json.run_id,\n        app_name: $node['Context'].json.app_name,\n        github_owner: $node['Context'].json.github_owner,\n        defaults: $node['Context'].json.defaults,\n        current_message: $node['Context'].json.user_message,\n        context_path: $node['Context'].json.run_dir + '/context.json'\n      })\n    }\n  ]\n})}}"
       },
       "id": "RefineLLM",
       "name": "Call OpenClaw (Refine)",
@@ -83,7 +83,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const content = ($json.choices?.[0]?.message?.content || '').trim();\nlet parsed;\ntry { parsed = JSON.parse(content); }\ncatch(e) { parsed = { phase:'refine', needs_input:true, questions:[{key:'error',q:'OpenClaw did not return valid JSON.'}], raw:content }; }\nreturn { json: parsed };"
+        "jsCode": "const content = ($json.output?.[0]?.content?.[0]?.text || $json.choices?.[0]?.message?.content || '').trim();\nlet parsed;\ntry { parsed = JSON.parse(content); }\ncatch(e) { parsed = { phase:'refine', needs_input:true, questions:[{key:'error',q:'OpenClaw did not return valid JSON.'}], raw:content }; }\nreturn { json: parsed };"
       },
       "id": "ParseRefine",
       "name": "Parse Refine Output",

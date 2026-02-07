@@ -143,5 +143,5 @@ that `name`, `nodes`, and `connections` exist before sending to the API.
   - deletions
 
 See:
-- [ops/docs/ACTION_DRAFT_PROTOCOL.md](ops/docs/ACTION_DRAFT_PROTOCOL.md)
-- [ops/docs/SECURITY.md](ops/docs/SECURITY.md)
+- [ACTION_DRAFT_PROTOCOL.md](ACTION_DRAFT_PROTOCOL.md)
+- [SECURITY.md](SECURITY.md)

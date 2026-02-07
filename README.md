@@ -147,8 +147,9 @@ Based on `ops/infra/.env.example`:
 - `POSTGRES_PASSWORD` — Database password
 - `N8N_ENCRYPTION_KEY` — At least 32 characters
 - `OPENAI_API_KEY` — For embeddings
-- `MISTRAL_API_KEY` — For LLM (WF_40 uses Mistral)
+- `OPENCLAW_GATEWAY_TOKEN` — OpenClaw auth token
 - Telegram Bot Token — Configure in n8n credentials
+- LLM API key — WF_40 uses Mistral via OpenRouter (configure in n8n)
 
 ### 3. Deploy
 Coolify handles the rest. The init scripts in `ops/infra/postgres/init/` run automatically on first DB creation.
@@ -224,8 +225,9 @@ janAGI/
 │   │   └── workflows/             # WF_10–WF_41 templates
 │   ├── scripts/
 │   │   └── openclaw_spec_execute.sh
-│   └── services/
-│       └── clawd_worker/          # Optional web scraping worker
+│   ├── services/                   # Legacy (see _archive/)
+│   └── _archive/                   # Archived legacy code
+│       └── clawd_worker_legacy/
 └── .gitignore
 ```
 

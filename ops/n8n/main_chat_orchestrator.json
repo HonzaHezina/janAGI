@@ -20,7 +20,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.start_run($1, 'janagi', $2, 'chat')",
+        "query": "SELECT * FROM rag.start_run_for_thread('781594f6-132b-4d47-9933-6499223dbd56'::uuid, '56c83308-384e-4e27-8893-2aa46b845851'::uuid, 'telegram', $1, 'chat', $2)",
         "additionalFields": {
           "queryParams": "={{$json.message.chat.id}},{{$json.message.chat.id.toString()}}"
         }
@@ -36,7 +36,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.log_event($1, 'message', 'user', $2, $3::jsonb)",
+        "query": "SELECT rag.log_event('781594f6-132b-4d47-9933-6499223dbd56'::uuid, '56c83308-384e-4e27-8893-2aa46b845851'::uuid, $1::uuid, $2::uuid, 'user', 'telegram', 'message', NULL, $3::jsonb)",
         "additionalFields": {
           "queryParams": "={{$node[\"Start Run\"].json.start_run}},{{$json.message.text}},{{JSON.stringify($json.message)}}"
         }
@@ -79,7 +79,7 @@
     {
       "parameters": {
         "model": "gpt-4-turbo-preview",
-        "prompt": "=You are OpenClaw (Jackie), an autonomous agent dispatcher.\n\nCONTEXT FROM MEMORY:\n{{ JSON.stringify($json.results) }}\n\nUSER MESSAGE:\n{{ $node[\"Telegram Trigger\"].json.message.text }}\n\nINSTRUCTIONS:\n1. Answer the user helpfuly.\n2. If the user provides a new specific instruction/fact, add a section at the end: \"[[MEMORY: <fact>]]\".\n3. If the user wants to start a project/spec, add \"[[TRIGGER_SPEC: <project_name>]]\".",
+        "prompt": "=You are Jackie, the AI persona running via OpenClaw (a self-hosted AI agent gateway).\n\nCONTEXT FROM MEMORY:\n{{ JSON.stringify($json.results) }}\n\nUSER MESSAGE:\n{{ $node[\"Telegram Trigger\"].json.message.text }}\n\nINSTRUCTIONS:\n1. Answer the user helpfuly.\n2. If the user provides a new specific instruction/fact, add a section at the end: \"[[MEMORY: <fact>]]\".\n3. If the user wants to start a project/spec, add \"[[TRIGGER_SPEC: <project_name>]]\".",
         "options": {}
       },
       "name": "AI Agent (Router)",
@@ -105,7 +105,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO chat.messages (platform, chat_id, role, content)\nVALUES ('telegram', $1, 'assistant', $2);",
+        "query": "SELECT rag.log_event('781594f6-132b-4d47-9933-6499223dbd56'::uuid, '56c83308-384e-4e27-8893-2aa46b845851'::uuid, $1::uuid, $2::uuid, 'n8n', 'ai_jackie', 'message', NULL, jsonb_build_object('text', $3))",
         "additionalFields": {
           "queryParams": "={{$json.chat_id}},{{$json.response_text}}"
         }

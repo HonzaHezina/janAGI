@@ -1,4 +1,5 @@
--- Analytics tables (written by MindsDB / batch jobs)
+-- Analytics tables (written by MindsDB — Federated Query Engine for AI)
+-- MindsDB connects, unifies, and responds from multiple data sources.
 -- Keep analytics separate from rag.* so it can evolve independently.
 
 CREATE SCHEMA IF NOT EXISTS analytics;

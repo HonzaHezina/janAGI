@@ -1,10 +1,9 @@
-// n8n Function / Code node: Normalize Telegram Payload
+// n8n Code node (v2): Normalize Telegram Payload
 // Why: Telegram sends 'message' for new chats, but 'callback_query' for button clicks.
 //      This unifies them so subsequent nodes (log_event, etc.) always see a chat_id.
+// Note: Uses $json (v2 Code node API). For v1 Code nodes, use items[0].json instead.
 
-const payload = items[0].json;
-
-let body = payload.body || payload; // Webhook body often in 'body'
+const body = $json.body || $json; // Webhook body often in 'body'
 
 // Normalize Chat ID
 let chatId = undefined;

@@ -31,7 +31,7 @@ These use old function signatures or deprecated APIs. Kept for reference only.
 
 | File | Status | Issue |
 |------|--------|-------|
-| `main_chat_orchestrator.json` | ⚠️ Legacy | Uses old `rag.start_run()` (4-arg), old `rag.log_event()` (5-arg), references dead `chat.messages` table. **Superseded by WF_40.** |
+| `main_chat_orchestrator.json` | ⚠️ Legacy | Early prototype, now updated to use correct `rag.*` functions. **Superseded by WF_40.** |
 | `WF_01_Ingest_Message.json` | ⚠️ Legacy | Calls Mistral embeddings API directly. Use `memory_workflows.json` (OpenAI) instead. |
 | `WF_02_Hunter_Run.json` | ⚠️ Legacy | Calls `clawd_worker:8090/tasks/hunt` (service commented out in docker-compose). |
 | `WF_03_Analyst_Draft_and_Telegram_Approval.json` | ⚠️ Legacy | Uses Mistral model + old n8n-langchain PGVector node. |

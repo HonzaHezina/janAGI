@@ -1,17 +1,16 @@
 # MindsDB daily jobs (notes)
 
-Doporučený pattern:
-- MindsDB běží batch (denně).
-- Výsledky zapisuje do `analytics.*`.
-- n8n jen čte `analytics.*` a používá to v prioritizaci / reportingu.
+MindsDB is a Federated Query Engine for AI (Connect → Unify → Respond).
+In janAGI, it runs scheduled jobs that write results to `analytics.*`.
+n8n reads `analytics.*` and uses it for prioritization/reporting.
 
 ## Example: connect Postgres
 ```sql
 CREATE DATABASE janagi_pg
 WITH ENGINE = 'postgres',
 PARAMETERS = {
-  "host": "postgres",        -- docker-compose service name
-  "port": "5432",            -- Coolify: use "janagi-db" as host
+  "host": "janagi-db",       -- Coolify resource name (docker-compose: "postgres")
+  "port": "5432",
   "user": "mindsdb_ro",
   "password": "*****",
   "database": "janagi",

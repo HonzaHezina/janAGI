@@ -75,7 +75,8 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
-  # OpenClaw / Jackie — AI agent with browser/CLI tools
+  # OpenClaw — Self-hosted AI agent gateway (wraps LLMs + adds tools/sessions/skills)
+  # Jackie is the agent persona configured in OpenClaw.
   # INTERNAL ONLY: no public ports exposed. Always require auth token.
   # In Coolify, rename this resource to "openclaw" for stable hostname.
   # openclaw:
@@ -90,8 +91,9 @@ services:
   #     postgres:
   #       condition: service_healthy
 
-  # MindsDB — batch analytics, lead scoring, trend detection
-  # Connects to Postgres as read-only data source, writes to analytics.* schema
+  # MindsDB — Federated Query Engine for AI (Connect → Unify → Respond)
+  # Connects to Postgres as federated data source, writes analytics to analytics.* schema
+  # Built-in MCP server, knowledge bases, views, scheduled jobs
   # In Coolify, rename this resource to "mindsdb" for stable hostname.
   mindsdb:
     image: mindsdb/mindsdb:latest
