@@ -1,0 +1,27 @@
+// Enable OpenResponses endpoint + ensure the Browser tool is allowlisted.
+// Merge into your ~/.openclaw/openclaw.json and restart gateway.
+// Docs: https://docs.openclaw.ai/tools (tool policy) + https://docs.openclaw.ai/tools/browser
+{
+  "gateway": {
+    "http": {
+      "endpoints": {
+        "responses": { "enabled": true },
+        "chatCompletions": { "enabled": true }
+      }
+    }
+  },
+  "tools": {
+    // If you use a restrictive tool profile/allowlist, browser may be excluded.
+    // This explicitly allowlists browser (and keeps other tools unchanged).
+    "allow": ["browser"],
+    // Optional: prevent Brave-key errors by disallowing web_search globally.
+    // Comment out if you want web_search.
+    "deny": ["web_search"]
+  },
+  "browser": {
+    // Use OpenClaw-managed isolated browser profile by default.
+    // (The default profile in docs is "chrome" which requires the extension relay.)
+    "enabled": true,
+    "defaultProfile": "openclaw"
+  }
+}
