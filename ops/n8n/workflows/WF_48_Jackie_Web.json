@@ -126,7 +126,18 @@
       ]
     }
   },
-  "pinData": {},
+  "pinData": {
+    "Execute Workflow Trigger": [
+      {
+        "json": {
+          "text": "Vyhledej mi aktuální kurz CZK vůči USD",
+          "chat_id": 12345,
+          "conversation_id": "manual-test",
+          "run_id": "manual-run"
+        }
+      }
+    ]
+  },
   "settings": {
     "executionOrder": "v1"
   },
