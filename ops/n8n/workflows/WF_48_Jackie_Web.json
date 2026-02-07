@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Použijeme $input.all(), což vezme všechna data, která do tohoto uzlu přišla\n// Pokud jsou data prázdná (testování bez vstupu), vytvoříme prázdný objekt, aby to nepadlo\nconst trigger = $input.first() ? $input.first().json : {};\n\n// Bezpečně získáme text\nconst text = String(trigger.text || '').trim();\n\n// Pokud je text prázdný (což při přímém testu sub-workflow bude), použijeme default\nconst prompt = text && text.length > 0\n  ? `Search the web for: \"${text}\". Return top 5 results with titles and absolute URLs. If the user provided a specific URL, fetch it and return key facts.`\n  : 'Search the web for recent relevant results. Return top 5 results with titles and absolute URLs.';\n\nreturn [{\n  json: {\n    // Pokud chat_id neexistuje, dáme tam null nebo placeholder, aby to nepadlo\n    chat_id: trigger.chat_id || null,\n    conversation_id: trigger.conversation_id || null,\n    run_id: trigger.run_id || null,\n    prompt: prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];"
+        "jsCode": "// Použijeme $input.all(), což vezme všechna data, která do tohoto uzlu přišla\n// Pokud jsou data prázdná (testování bez vstupu), vytvoříme prázdný objekt, aby to nepadlo\nconst trigger = $input.first() ? $input.first().json : {};\n\n// Bezpečně získáme text\nconst text = String(trigger.text || '').trim();\nconst safeQuery = text.replace(/\\s+/g, ' ').trim();\n\n// DŮLEŽITÉ: Na produkci chceme použít web_browser tool (procházení stránek), ne web_search (API klíče).\n// Proto v promptu výslovně zakážeme web_search a navádíme na browser-based search (DuckDuckGo/Google přes web_browser).\nconst prompt = safeQuery && safeQuery.length > 0\n  ? `You are Jackie (web handler).\n\nTOOLS\n- You MUST use the web_browser tool (browser mode).\n- Do NOT use web_search.\n\nTASK\nFind current information for: ${safeQuery}.\nIf you need to search, use web_browser to open a public search results page (e.g. DuckDuckGo/Google) and extract results from the page.\n\nOUTPUT\nReturn the top 5 results. For each: title, absolute URL, and 1-sentence Czech summary.\nReply in Czech.`\n  : `You are Jackie (web handler).\n\nTOOLS\n- You MUST use the web_browser tool (browser mode).\n- Do NOT use web_search.\n\nTASK\nFind 5 recent relevant results. If you need to search, use web_browser to open a public search results page (e.g. DuckDuckGo/Google).\n\nOUTPUT\nReturn the top 5 results: title, absolute URL, and 1-sentence Czech summary.\nReply in Czech.`;\n\nreturn [{\n  json: {\n    // Pokud chat_id neexistuje, dáme tam null nebo placeholder, aby to nepadlo\n    chat_id: trigger.chat_id || null,\n    conversation_id: trigger.conversation_id || null,\n    run_id: trigger.run_id || null,\n    prompt: prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];"
       },
       "id": "1170041c-b8ea-4d40-b5cb-bf779095aa39",
       "name": "Build Web Prompt",
@@ -52,6 +52,10 @@
             {
               "name": "model",
               "value": "={{ $json.model }}"
+            },
+            {
+              "name": "user",
+              "value": "={{ 'telegram:' + ($json.chat_id || 'unknown') }}"
             },
             {
               "name": "=input",
