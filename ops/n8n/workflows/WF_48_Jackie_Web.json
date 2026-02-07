@@ -30,7 +30,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$env.OPENCLAW_BASE_URL || 'http://openclaw:18789'}}/v1/responses",
+        "url": "http://openclaw:18789/v1/responses",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpBearerAuth",
         "sendHeaders": true,
@@ -54,11 +54,7 @@
               "value": "={{ $json.model }}"
             },
             {
-              "name": "user",
-              "value": "={{ 'telegram:' + ($json.chat_id || 'unknown') }}"
-            },
-            {
-              "name": "input",
+              "name": "=input",
               "value": "={{ $json.prompt }}"
             }
           ]
