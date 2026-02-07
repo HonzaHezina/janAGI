@@ -1,0 +1,91 @@
+{
+  "name": "WF_47 Jackie Clarify",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c47-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-200, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are Jackie. Your only job in this node is to clarify the user's intent when it is ambiguous.\n\nToday's date is {{ $today.format('yyyy-MM-dd') }} (Europe/Prague).\n\nRules:\n- Do NOT use any tools.\n- Do NOT make assumptions.\n- Ask ONLY ONE clarifying question.\n- Keep it short (max 3 lines).\n- If the user message is empty or unclear, ask them to rephrase in one sentence.\n\nOutput:\n- Return only the clarifying question in Czech, nothing else.\n\nQuestion template (use or adapt this):\n'Chceš to řešit jako:\n📅 SCHŮZKA (kalendář)\n✅ ÚKOL (to-do)\n📧 EMAIL\n💬 CHAT (obecná otázka/odpověď)\n\nPokud potřebuješ web search nebo programování, napiš to hlavnímu Jackie botovi.\n\nNapiš prosím jedno slovo nebo upřesni požadavek.'"
+        }
+      },
+      "id": "c47-agent",
+      "name": "Clarify AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [200, 300],
+      "typeVersion": 1.6
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "c47-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [80, 540],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chat_id }}_clarify"
+      },
+      "id": "c47-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [240, 540],
+      "typeVersion": 1.2
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Clarify AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          { "node": "Clarify AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          { "node": "Clarify AI Agent", "type": "ai_memory", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}

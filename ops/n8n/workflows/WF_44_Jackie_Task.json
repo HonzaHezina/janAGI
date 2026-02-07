@@ -1,0 +1,129 @@
+{
+  "name": "WF_44 Jackie Task",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c44-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-200, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are Jackie, a task assistant.\n\nToday's date is {{ $today.format('yyyy-MM-dd') }} (Europe/Prague).\n\nScope:\n- You ONLY handle tasks/reminders/todos: create, list, update, prioritize, and clarify deadlines.\n- If the user asks for email/meetings, respond: 'Tohle vypadá jako požadavek na email/schůzku. Zkus to napsat znovu.'.\n\nRules:\n- Never invent details. Use only what the user provided.\n- If the user says 'remind me' but no time/date is given, ask ONE clarifying question.\n- If it's a general todo without deadline, allow creating it without due date.\n- Use the connected Google Tasks tools to create and list tasks.\n- Always confirm after creating a task.\n\nOutput format for creating a task:\n- Task title:\n- Notes (optional):\n- Due date (optional):\n- Priority: low/normal/high\n- Status: created ✅\n\nStyle:\n- Czech language unless the user writes in English.\n- Be concise and action-oriented."
+        }
+      },
+      "id": "c44-agent",
+      "name": "Task AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [200, 300],
+      "typeVersion": 1.6
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "c44-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [80, 540],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chat_id }}_task"
+      },
+      "id": "c44-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [240, 540],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "task": "MTY1MTc5NzMxMzA5NDc5MTQ5NzQ6MDow",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}",
+        "additionalFields": {}
+      },
+      "id": "c44-task-create",
+      "name": "Create Task",
+      "type": "n8n-nodes-base.googleTasksTool",
+      "position": [400, 540],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "task": "MTY1MTc5NzMxMzA5NDc5MTQ5NzQ6MDow",
+        "additionalFields": {}
+      },
+      "id": "c44-task-list",
+      "name": "List Tasks",
+      "type": "n8n-nodes-base.googleTasksTool",
+      "position": [560, 540],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Task AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          { "node": "Task AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          { "node": "Task AI Agent", "type": "ai_memory", "index": 0 }
+        ]
+      ]
+    },
+    "Create Task": {
+      "ai_tool": [
+        [
+          { "node": "Task AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "List Tasks": {
+      "ai_tool": [
+        [
+          { "node": "Task AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}

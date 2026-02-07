@@ -1,0 +1,606 @@
+{
+  "name": "WF_42 Jackie Classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "c42-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [-1200, 300],
+      "webhookId": "wf42-telegram-trigger",
+      "typeVersion": 1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BsEzRf2V5iDa2CvB",
+          "name": "Telegram account PN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $json?.message?.text || '' }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $json?.message?.chat?.id || $json?.message?.from?.id || '' }}"
+            },
+            {
+              "name": "user_id",
+              "stringValue": "={{ $json?.message?.from?.id || '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-voicetext",
+      "name": "Voice or Text",
+      "type": "n8n-nodes-base.set",
+      "position": [-960, 300],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c42-if-empty",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.text }}",
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c42-if",
+      "name": "If text empty",
+      "type": "n8n-nodes-base.if",
+      "position": [-720, 300],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "id": "c42-getvoice",
+      "name": "Get Voice File",
+      "type": "n8n-nodes-base.telegram",
+      "position": [-480, 160],
+      "webhookId": "wf42-voice",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BsEzRf2V5iDa2CvB",
+          "name": "Telegram account PN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-flash-latest",
+          "mode": "list",
+          "cachedResultName": "models/gemini-flash-latest"
+        },
+        "inputType": "binary",
+        "options": {}
+      },
+      "id": "c42-transcribe",
+      "name": "Transcribe",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "position": [-240, 160],
+      "typeVersion": 1,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ZBP8zcaHHlh4WAha",
+          "name": "Google Gemini(PaLM) Api account PN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Voice or Text').item.json.chat_id }}"
+            },
+            {
+              "name": "user_id",
+              "stringValue": "={{ $('Voice or Text').item.json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-mergefields",
+      "name": "Set transcribed text",
+      "type": "n8n-nodes-base.set",
+      "position": [0, 160],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $json.text }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "MEETING",
+              "description": "The user wants to create, move, cancel, or ask about a calendar event/meeting. Mentions date/time (today/tomorrow/next week), availability, scheduling, invitation, 'schůzka', 'meeting', 'kalendář', 'termín', 'pozvánka', 'kdy mám volno', 'naplánuj'."
+            },
+            {
+              "category": "TASK",
+              "description": "The user wants to create or manage a task/reminder/todo. Mentions 'úkol', 'připomeň', 'to-do', 'deadline', 'do pátku', 'zapiš si', 'nezapomeň', follow-up. Not a calendar meeting."
+            },
+            {
+              "category": "EMAIL",
+              "description": "The user wants to read/summarize/search/reply/send an email. Mentions 'email', 'mail', 'pošta', 'Gmail', 'přečti poslední', 'shrň', 'odpověz', 'draft', 'přepošli', 'najdi email'."
+            },
+            {
+              "category": "CHAT",
+              "description": "The user asks a general question, wants to chat, asks about previous results, wants explanation, summary, advice, opinion, plan, or asks about background task results. Mentions 'co víš o', 'vysvětli', 'shrň', 'poraď', 'jaký výsledek', 'co se zjistilo'. Default category when intent is clear but not MEETING/TASK/EMAIL."
+            },
+            {
+              "category": "UNKNOWN",
+              "description": "The intent is unclear or could be multiple categories. Use when not confident enough to classify into MEETING/TASK/EMAIL/CHAT."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-classifier",
+      "name": "Classify Intent",
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "position": [240, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "c42-llm-classifier",
+      "name": "Classifier LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [240, 520],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{ $json.chat_id }}'::text,\n  'classifier',\n  ('Classifier ' || '{{ $json.chat_id }}')::text,\n  '{}'::jsonb,\n  '{}'::jsonb\n);\n",
+        "options": {}
+      },
+      "id": "c42-startrun",
+      "name": "Start Run",
+      "type": "n8n-nodes-base.postgres",
+      "position": [520, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $json.conversation_id }}'::uuid,\n  '{{ $json.run_id }}'::uuid,\n  'user',\n  '{{ $('Voice or Text').item.json.user_id }}'::text,\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'user',\n    'text', to_jsonb('{{ $('Classify Intent').item.json.text }}'::text),\n    'channel', 'telegram',\n    'category', '{{ $('Classify Intent').item.json.categorized_to || \"unknown\" }}'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "id": "c42-loguser",
+      "name": "Log User Msg",
+      "type": "n8n-nodes-base.postgres",
+      "position": [760, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "version": 2, "leftValue": "", "caseSensitive": false, "typeValidation": "loose" },
+                "conditions": [{ "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}", "rightValue": "MEETING", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "MEETING"
+            },
+            {
+              "conditions": {
+                "options": { "version": 2, "leftValue": "", "caseSensitive": false, "typeValidation": "loose" },
+                "conditions": [{ "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}", "rightValue": "TASK", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "TASK"
+            },
+            {
+              "conditions": {
+                "options": { "version": 2, "leftValue": "", "caseSensitive": false, "typeValidation": "loose" },
+                "conditions": [{ "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}", "rightValue": "EMAIL", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "EMAIL"
+            },
+            {
+              "conditions": {
+                "options": { "version": 2, "leftValue": "", "caseSensitive": false, "typeValidation": "loose" },
+                "conditions": [{ "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}", "rightValue": "CHAT", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "CHAT"
+            }
+          ],
+          "fallbackOutput": "UNKNOWN"
+        },
+        "options": {}
+      },
+      "id": "c42-switch",
+      "name": "Route by Category",
+      "type": "n8n-nodes-base.switch",
+      "position": [1040, 300],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "c42-exec-meeting",
+      "name": "Execute Meeting WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 60],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "c42-exec-task",
+      "name": "Execute Task WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 220],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "c42-exec-email",
+      "name": "Execute Email WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 380],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "c42-exec-chat",
+      "name": "Execute Chat WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 540],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "c42-exec-unknown",
+      "name": "Execute Clarify WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 700],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $('Start Run').item.json.conversation_id }}'::uuid,\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'n8n',\n  'ai_jackie',\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'assistant',\n    'text', to_jsonb('{{ $json.output ? $json.output.replace(/'/g, \"''\") : \"\" }}'::text),\n    'channel', 'telegram'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "id": "c42-logbot",
+      "name": "Log Bot Msg",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1640, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.finish_run(\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'completed',\n  NULL,\n  jsonb_build_object('category', '{{ $('Classify Intent').item.json.categorized_to || \"unknown\" }}')\n);\n",
+        "options": {}
+      },
+      "id": "c42-finish",
+      "name": "Finish Run",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1880, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Voice or Text').item.json.chat_id }}",
+        "text": "={{ $('Log Bot Msg').item.json.output || $json.output || 'Omlouvám se, něco se pokazilo.' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "c42-reply",
+      "name": "Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "position": [2120, 300],
+      "webhookId": "wf42-reply",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BsEzRf2V5iDa2CvB",
+          "name": "Telegram account PN"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          { "node": "Voice or Text", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Voice or Text": {
+      "main": [
+        [
+          { "node": "If text empty", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "If text empty": {
+      "main": [
+        [
+          { "node": "Get Voice File", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Classify Intent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Voice File": {
+      "main": [
+        [
+          { "node": "Transcribe", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Transcribe": {
+      "main": [
+        [
+          { "node": "Set transcribed text", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Set transcribed text": {
+      "main": [
+        [
+          { "node": "Classify Intent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Classifier LLM": {
+      "ai_languageModel": [
+        [
+          { "node": "Classify Intent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Classify Intent": {
+      "main": [
+        [
+          { "node": "Start Run", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Start Run", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Start Run", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Start Run", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Start Run", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Start Run": {
+      "main": [
+        [
+          { "node": "Log User Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Log User Msg": {
+      "main": [
+        [
+          { "node": "Route by Category", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Route by Category": {
+      "main": [
+        [
+          { "node": "Execute Meeting WF", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Execute Task WF", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Execute Email WF", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Execute Chat WF", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Execute Clarify WF", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute Meeting WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute Task WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute Email WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute Chat WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute Clarify WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Log Bot Msg": {
+      "main": [
+        [
+          { "node": "Finish Run", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Finish Run": {
+      "main": [
+        [
+          { "node": "Telegram Reply", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}

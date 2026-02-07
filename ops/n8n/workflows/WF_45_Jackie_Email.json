@@ -1,0 +1,182 @@
+{
+  "name": "WF_45 Jackie Email",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c45-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-200, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are Jackie, an email assistant.\n\nToday's date is {{ $today.format('yyyy-MM-dd') }} (Europe/Prague).\n\nScope:\n- You ONLY handle email tasks: searching inbox, reading emails, summarizing, drafting replies, and sending emails.\n- If the user asks for meetings/tasks, respond: 'Tohle vypadá jako požadavek na schůzku/úkol.'.\n\nCore rules:\n- Never invent email content. Use only tool outputs (from/subject/date/snippet/body).\n- Default language: Czech (unless user writes in English).\n- Be concise and action-oriented.\n\nInterpretation:\n- 'Nové emaily' means the MOST RECENT by date, NOT 'unread'.\n- Only treat 'nové' as unread when user explicitly says 'nepřečtené / unread'.\n\nTool policy:\n- Use email_search FIRST whenever you need to find emails.\n- Always fill Search with Gmail-style query (examples: in:inbox, newer_than:2d, is:unread, from:, subject:, after:YYYY/MM/DD).\n- Never use any date filters outside the Search query.\n- Use email_read only when the user requests details, wants a summary of a specific email, or wants a reply drafted to a specific thread. Always pick the email by id from email_search.\n- Use email_send ONLY if the user explicitly says 'odeslat' / 'send'. Otherwise output a DRAFT.\n\nDefault behaviors:\n- If user asks: 'Mám nějaké nové emaily?'\n  -> call email_search with Search: in:inbox newer_than:2d\n  -> If 0 results: call email_search with Search: in:inbox\n  -> Show the 3 newest (from/subject/date/snippet).\n\n- If user asks for '3 poslední emaily' (even read):\n  -> call email_search with Search: in:inbox\n  -> Show the 3 newest.\n\n- If user asks 'nepřečtené':\n  -> call email_search with Search: in:inbox is:unread\n\nWhen summarizing a specific email:\n  Output format:\n  Odesílatel:\n  Datum:\n  Předmět:\n  Shrnutí (3–6 bodů max):\n  Doporučený další krok (1 řádek):\n\nClarifications:\n- Ask ONE question only if essential (e.g., which email/thread, recipient, or whether to send vs draft)."
+        }
+      },
+      "id": "c45-agent",
+      "name": "Email AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [200, 300],
+      "typeVersion": 1.6
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "c45-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [80, 540],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chat_id }}_email"
+      },
+      "id": "c45-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [240, 540],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "email_search — Search emails (INBOX)\n\nUse this tool to LIST and SEARCH emails in INBOX.\nReturn a list of messages with: id, from, subject, date, snippet.\nALWAYS use the Search parameter (Gmail query syntax). Do NOT rely on 'unread only' unless user asks.\n\nDefault queries:\n- Latest emails (fallback): in:inbox\n- 'New emails' = most recent by date: in:inbox newer_than:2d\n- Unread (only if user says 'nepřečtené'): in:inbox is:unread\n- From specific sender: in:inbox from:someone@example.com\n- Subject keyword: in:inbox subject:(keyword)\n- After date: in:inbox after:YYYY/MM/DD\n\nRules:\n- If user asks 'mám nové emaily?' first use in:inbox newer_than:2d.\n- If zero results, run fallback in:inbox and show the 3 newest emails.",
+        "operation": "getAll",
+        "limit": 20,
+        "filters": {
+          "q": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Search', ``, 'string') }}"
+        }
+      },
+      "id": "c45-email-search",
+      "name": "email_search",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [400, 540],
+      "webhookId": "wf45-gmail-search",
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dfYt4eufdATehpW0",
+          "name": "Gmail account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "email_read — Read one email\n\nUse after email_search when you need full content.\nInput: Message ID\nOutput: from, to, subject, date, snippet, body.\nNever invent body. Summarize only from returned fields.",
+        "operation": "get",
+        "messageId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message_ID', ``, 'string') }}"
+      },
+      "id": "c45-email-read",
+      "name": "email_read",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [560, 540],
+      "webhookId": "wf45-gmail-read",
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dfYt4eufdATehpW0",
+          "name": "Gmail account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "email_send — Send email\n\nUse ONLY when the user explicitly says 'odeslat / send'.\nRequired: to, subject, message/body. Optional: cc, bcc.\nIf user says 'napiš / připrav odpověď', produce a DRAFT only and do NOT call this tool.",
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', ``, 'string') }}",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "emailType": "text",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {
+          "appendAttribution": false,
+          "bccList": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('BCC', ``, 'string') }}",
+          "ccList": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('CC', ``, 'string') }}"
+        }
+      },
+      "id": "c45-email-send",
+      "name": "email_send",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [720, 540],
+      "webhookId": "wf45-gmail-send",
+      "typeVersion": 2.1,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dfYt4eufdATehpW0",
+          "name": "Gmail account JH"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Email AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          { "node": "Email AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          { "node": "Email AI Agent", "type": "ai_memory", "index": 0 }
+        ]
+      ]
+    },
+    "email_search": {
+      "ai_tool": [
+        [
+          { "node": "Email AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "email_read": {
+      "ai_tool": [
+        [
+          { "node": "Email AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "email_send": {
+      "ai_tool": [
+        [
+          { "node": "Email AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}

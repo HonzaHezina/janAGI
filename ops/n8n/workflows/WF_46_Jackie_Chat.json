@@ -1,0 +1,158 @@
+{
+  "name": "WF_46 Jackie Chat",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c46-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-400, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  a.title,\n  LEFT(a.content_text, 500) AS content_preview,\n  a.kind,\n  a.created_at\nFROM rag.artifacts a\nWHERE a.client_id = '781594f6-132b-4d47-9933-6499223dbd56'::uuid\n  AND a.project_id = '56c83308-384e-4e27-8893-2aa46b845851'::uuid\nORDER BY a.created_at DESC\nLIMIT 5;\n",
+        "options": {}
+      },
+      "id": "c46-artifacts",
+      "name": "Load Recent Artifacts",
+      "type": "n8n-nodes-base.postgres",
+      "position": [-160, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT role, content, ts\nFROM (\n  SELECT\n    COALESCE(payload->>'role', actor_type) AS role,\n    COALESCE(\n      payload->>'text',\n      payload->>'content',\n      payload->>'message',\n      payload->>'raw'\n    ) AS content,\n    ts\n  FROM rag.events\n  WHERE conversation_id = '{{ $('Execute Workflow Trigger').item.json.conversation_id }}'::uuid\n    AND event_type = 'message'\n    AND COALESCE(payload->>'role', actor_type) IN ('user','assistant')\n    AND COALESCE(payload->>'text', payload->>'content', payload->>'message', payload->>'raw') IS NOT NULL\n  ORDER BY ts DESC\n  LIMIT 20\n) t\nORDER BY ts ASC;\n",
+        "options": {}
+      },
+      "id": "c46-history",
+      "name": "Load Chat History",
+      "type": "n8n-nodes-base.postgres",
+      "position": [80, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge artifacts + history into context for the AI agent\nconst trigger = $('Execute Workflow Trigger').first().json;\nconst artifacts = $('Load Recent Artifacts').all().map(i => i.json);\nconst history = $('Load Chat History').all().map(i => i.json);\n\n// Format history (oldest first)\nconst historyText = history\n  .map(r => `[${r.role}] ${r.content}`)\n  .join('\\n');\n\n// Format artifacts context\nconst artifactsText = artifacts.length > 0\n  ? artifacts.map(a => `--- ${a.kind}: ${a.title} (${a.created_at}) ---\\n${a.content_preview}`).join('\\n\\n')\n  : '(žádné artefakty)';\n\nreturn [{\n  json: {\n    text: trigger.text,\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    historyText,\n    artifactsContext: artifactsText\n  }\n}];\n"
+      },
+      "id": "c46-merge",
+      "name": "Build Context",
+      "type": "n8n-nodes-base.code",
+      "position": [320, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are Jackie, a general-purpose assistant for the janAGI system.\n\nToday's date is {{ $today.format('yyyy-MM-dd') }} (Europe/Prague).\n\nYou have access to:\n1) Conversation history from the current chat thread\n2) Recent artifacts from background tasks (web scraping, code builds via OpenClaw)\n3) Your own knowledge\n\n## BACKGROUND TASK RESULTS\nThe following are recent artifacts from background tasks (web scraping, builds, etc.):\n{{ $json.artifactsContext }}\n\n## CONVERSATION HISTORY\n{{ $json.historyText }}\n\n## RULES\n- Answer in Czech unless the user writes in English.\n- Be concise, professional, slightly witty.\n- When asked about results of background tasks (web search, scraping, builds), refer to the artifacts above.\n- If no relevant artifact exists, say so honestly: 'Zatím nemám žádné výsledky z background úloh. Zkus to zadat přes hlavního Jackie bota.'\n- Never invent data. Only use what's in the artifacts or conversation history.\n- For general knowledge questions, use your own knowledge but be clear about what's from artifacts vs. your training.\n- If the user's request would benefit from a web search or code build, suggest: 'Tohle by šlo řešit přes hlavního Jackie bota (web search / build). Chceš to tam zadat?'\n\n## SCOPE\n- General Q&A, advice, explanations, summaries\n- Querying results of previous background tasks\n- Helping plan next steps\n- NOT: calendar, tasks, emails (those have dedicated branches)"
+        }
+      },
+      "id": "c46-agent",
+      "name": "Chat AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [560, 300],
+      "typeVersion": 1.6
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "c46-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [440, 540],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chat_id }}_chat"
+      },
+      "id": "c46-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [600, 540],
+      "typeVersion": 1.2
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Load Recent Artifacts", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Load Recent Artifacts": {
+      "main": [
+        [
+          { "node": "Load Chat History", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Load Chat History": {
+      "main": [
+        [
+          { "node": "Build Context", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Context": {
+      "main": [
+        [
+          { "node": "Chat AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          { "node": "Chat AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          { "node": "Chat AI Agent", "type": "ai_memory", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}

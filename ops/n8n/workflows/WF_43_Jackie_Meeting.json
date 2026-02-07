@@ -1,0 +1,165 @@
+{
+  "name": "WF_43 Jackie Meeting",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c43-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-200, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are Jackie, a calendar assistant. Timezone: Europe/Prague.\nToday is {{ $today.format('yyyy-MM-dd') }}.\n\nYou MUST use the connected calendar tools. Never say you don't have access.\nNever ask whether to use tools.\n\nTOOLS:\n- calendar_list_events(after, before)\n- calendar_create_event(title, start, end, timezone, location, description, attendees)\n\nGENERAL RULES\n- Output to user must be Czech plain text only (no JSON, no markdown fences).\n- Never invent events. Never claim something was created unless the tool confirms it.\n\nLIST (mandatory tool-first)\n- If user asks about schedule/events/availability, ALWAYS call calendar_list_events once before replying.\n- Always send after + before (ISO datetime, Europe/Prague).\n- Reply only from tool results. If empty: say there are no events.\n\nDATE RANGE (Europe/Prague)\n- dnes => 00:00:00–23:59:59\n- zítra => 00:00:00–23:59:59\n- včera => 00:00:00–23:59:59\n- minulý týden => previous Monday 00:00:00 to Sunday 23:59:59\n- pokud není datum => dnes\n\nCREATE (no interrogation)\n- If user asks to plan/book/create a meeting, do CREATE.\n- Required only: date + start time (and end time or duration). Title can be inferred if missing ('Schůzka').\n- DO NOT ask for optional fields (description/agenda/notes). Use defaults:\n  - description = ''\n  - location = '' unless explicitly provided\n  - attendees = [] unless user explicitly provides emails\n  - timezone = 'Europe/Prague'\n- If user provides a time range (e.g., 9–10), use it directly.\n- If only start time is given, assume 60 minutes.\n- Ask EXACTLY ONE question ONLY if date OR start time is missing/unclear.\n\nCONFLICT + VERIFICATION (important)\n1) Before creating, call calendar_list_events for the exact target time window (after=start, before=end).\n   - If there is a conflict, ask ONE question:\n     'V tom čase už něco máte. Mám schůzku vytvořit i tak, nebo ji posunout? Pokud posunout, na kdy?'\n2) If no conflict, call calendar_create_event.\n3) After create, verify creation:\n   - If the create tool result contains an id or htmlLink, confirm success to user.\n   - If not, reply: 'Schůzku se nepodařilo vytvořit (kalendář to nepotvrdil). Zkuste to prosím znovu.'\n\nSUCCESS RESPONSE FORMAT\n- Confirm: title + date + time + location (if any) + attendees (if any)."
+        }
+      },
+      "id": "c43-agent",
+      "name": "Meeting AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [200, 300],
+      "typeVersion": 1.6
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "id": "c43-llm",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [80, 540],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.chat_id }}_meeting"
+      },
+      "id": "c43-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [240, 540],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "List calendar events between time_min and time_max (Europe/Prague). Return only events in that range.",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "=petrnovak137@gmail.com",
+          "mode": "id"
+        },
+        "options": {
+          "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+          "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+          "fields": "items(id,summary,description,location,start,end,attendees(email,displayName),htmlLink),timeZone"
+        }
+      },
+      "id": "c43-cal-list",
+      "name": "calendar_list_events",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [400, 540],
+      "typeVersion": 1.1,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "5UQtDLdyhKIzYHr4",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Create a calendar event with title, start, end, timezone, location, description, attendees.",
+        "calendar": {
+          "__rl": true,
+          "value": "=petrnovak137@gmail.com",
+          "mode": "id"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('attendees0_Attendees', ``, 'string') }}"
+          ],
+          "location": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Location', ``, 'string') }}",
+          "sendUpdates": "none",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "id": "c43-cal-create",
+      "name": "calendar_create_event",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [560, 540],
+      "typeVersion": 1.1,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "5UQtDLdyhKIzYHr4",
+          "name": "Google Calendar account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Meeting AI Agent", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          { "node": "Meeting AI Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          { "node": "Meeting AI Agent", "type": "ai_memory", "index": 0 }
+        ]
+      ]
+    },
+    "calendar_list_events": {
+      "ai_tool": [
+        [
+          { "node": "Meeting AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    },
+    "calendar_create_event": {
+      "ai_tool": [
+        [
+          { "node": "Meeting AI Agent", "type": "ai_tool", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}
