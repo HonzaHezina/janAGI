@@ -8,30 +8,31 @@ with native AI capabilities (LangChain-based AI agents, 400+ integrations,
 JS/Python code support) that orchestrates all processes through fixed workflows
 and uses **[OpenClaw](https://docs.openclaw.ai/)** as the AI agent gateway.
 
-**OpenClaw** is a self-hosted gateway that wraps LLM providers (Anthropic Claude,
-etc.) and adds agent capabilities — tools (web browsing, scraping, code
-execution), sessions, skills, and multi-agent routing. **Jackie** is the agent
-persona configured in OpenClaw. n8n uses OpenClaw's HTTP API (`/v1/responses`)
-as the brain for its AI Agent workflows. All systems share the same memory
-(`rag.*` schema in PostgreSQL).
+**Key Philosophy:**
+n8n is the "Central Nervous System" (Router) and OpenClaw provides the "Brain," "Eyes," and "Hands."
 
-OpenClaw provides:
-- **Think** — LLM reasoning, decision-making, conversation with memory
-- **See** — browse websites, read social media, scrape content
-- **Act** — build software projects using [Spec Kit](https://github.com/github/spec-kit)
-  (GitHub's spec-driven development toolkit), delegate implementation to
-  CLI tools (Gemini, Copilot), create and modify n8n workflows via API
+**OpenClaw** is a self-hosted gateway that provides:
+- **Think (Brain)** — LLM reasoning, decision-making, conversation with memory.
+- **See (Eyes)** — browse websites, read social media, monitor trends.
+- **Act (Hands)** — build software (Spec Kit), execute CLI tools, automate n8n.
 
-**[MindsDB](https://github.com/mindsdb/mindsdb)** is a **Federated Query Engine for AI** —
-it connects hundreds of data sources, unifies them via knowledge bases and views
-(no-ETL), and responds from unified data via built-in agents and MCP server.
-In janAGI it serves as the data federation and analytics layer — primarily for
-external business intelligence (combining data from multiple sources: browsing
-behavior, purchases, social interactions, CRM) and secondarily for internal
-operational analytics (conversation trends, usage patterns).
+**[MindsDB](https://github.com/mindsdb/mindsdb)** acts as the **Analytics & BI Layer**, connecting external data sources and providing operational insights.
 
-The user interacts with the system via **Telegram**. Everything runs as a
-self-hosted Docker stack on **Coolify** (Hostinger VPS).
+---
+
+## Evolution of Architecture
+
+### V1: The Monolith (Legacy)
+Initially, `WF_40` handled everything. A single AI Agent node tried to manage chat, web searching, and project building. This became hard to maintain and debug.
+
+### V2: The Router (Current)
+We evolved to a **Micro-Workflow** architecture centered on `WF_42` (Classifier Router).
+1.  **Ingest:** Standardize input.
+2.  **Classify:** A specialized LLM call determines if the intent is `CHAT`, `WEB`, `MEETING`, `TASK`, or `DEV`.
+3.  **Route:** Control is passed to a dedicated handler workflow (e.g., `WF_48` for Web).
+4.  **Execute:** The handler performs the task (using OpenClaw/Tools) and replies.
+
+This modular approach allows us to upgrade the "Web Researcher" without breaking the "Calendar Manager."
 
 ---
 
@@ -44,359 +45,108 @@ self-hosted Docker stack on **Coolify** (Hostinger VPS).
 | Database | Owner | Purpose |
 |----------|-------|---------|
 | `janagi` | `janagi` | Domain data: `rag.*` (events, memory, RAG), `analytics.*` (scores, trends) |
-| `n8n` (Coolify only) | `n8n` | n8n internal state (workflows, credentials, executions) — **optional separation** |
-
-> **Local dev:** one DB (`janagi`) used by both n8n and business data (n8n uses `public` schema).
-> **Coolify prod:** two separate DBs recommended. n8n upgrades can migrate its own DB schema;
-> keeping them apart means n8n and janAGI evolve independently.
+| `n8n` | `n8n` | n8n internal state (workflows, credentials, executions) |
 
 Schemas in `janagi` DB:
-- `rag.*` — Core operational data: clients, projects, conversations, runs, events, artifacts, and the RAG vector store (sources → documents → chunks with HNSW index).
-- `analytics.*` — MindsDB-written batch results: lead scores, daily trends.
-
-Extensions: `vector`, `pgcrypto`, `pg_trgm`, `unaccent`.
+- `rag.*` — Core operational data: projects, conversations, runs, events, artifacts, vector store.
+- `analytics.*` — MindsDB-written batch results.
 
 ### n8n (Integrator / Curator)
 
-[n8n](https://github.com/n8n-io/n8n) is a **fair-code workflow automation platform
-with native AI capabilities**. It supports visual workflow building and custom
-code (JavaScript/Python), has 400+ integrations, and builds AI agent workflows
-via LangChain — all self-hosted under a fair-code license.
+Functions as the traffic controller. It delegates intelligence to OpenClaw.
 
-In janAGI, n8n acts as the **integrator and curator** — it does NOT think or
-act on its own. It coordinates all processes through fixed workflows and
-delegates intelligence to OpenClaw. Think of n8n as a traffic controller:
-it routes requests, manages state (DB logging), enforces safety gates
-(Action Draft), and triggers the right sub-workflow at the right time.
+**Core Workflows (V2 Router):**
 
-**Core workflows:**
+1.  **Ingestion & Routing**
+    *   **Ingest** (`WF_01`): Standardizes inputs.
+    *   **Router / Brain** (`WF_42_Jackie_Classifier`): The entry point. Classifies intent and routes to handlers.
 
-1. **Chat Orchestrator** (`WF_40_Jackie_Telegram_Assistant.json`)
-   - Telegram Trigger → `rag.start_run_for_thread()` → `rag.log_event()` → Load History → AI Agent → Parse Actions → Reply
-   - Automatically extracts facts for memory storage (`[[MEMORY: ...]]`)
-   - Can trigger sub-workflows (`[[TRIGGER_SPEC: ...]]`) or ACTION_DRAFTs
-   - OpenClaw provides the reasoning; n8n routes the result
+2.  **Specialized Handlers (The "Limbs")**
+    *   **Chat** (`WF_46`): General conversation + RAG.
+    *   **Productivity** (`WF_43` Meeting, `WF_44` Task, `WF_45` Email).
+    *   **Web Intel** (`WF_48` Web): Browsing and research agent.
+    *   **Dev / Builder** (`WF_49` SpecKit): Software architect interface.
 
-2. **Action Subflow** (`WF_41_Jackie_Action_Subflow.json`)
-   - Executes approved actions via OpenClaw `/v1/responses`
-   - Web browsing, scraping, social media reading, any external action
-   - Logs artifacts and results back to DB
+3.  **Execution & Ops**
+    *   **Action Executor** (`WF_41`): Handles approved valid actions.
+    *   **Spec Engine** (`WF_30`): The implementation engine for software builds.
+    *   **System Builder** (`WF_20`): Automates n8n workflow creation.
 
-3. **Memory API** (`memory_workflows.json`)
-   - `POST /webhook/memory-upsert` — Embed + store content into `rag.chunks`
-   - `POST /webhook/memory-search` — Embed query + `rag.search_chunks()` → return matches
+### OpenClaw (AI Agent Gateway)
 
-4. **Spec-Kit Dispatcher** (`spec_kit_workflow.json`)
-   - Uses [Spec Kit](https://github.com/github/spec-kit) methodology: OpenClaw
-     asks the user spec-driven questions (what to build, constraints, acceptance
-     criteria) and helps them figure out what they need
-   - REFINE phase: Gather requirements conversationally → produce `locked.json`
-   - EXECUTE phase: Bootstrap repo with `specify init`, CLI tools run
-     `/speckit.*` slash commands → constitution → spec → plan → tasks → code
-   - Result: CLI tools start with proper, complete specifications — no vibe coding
+Internal API: `http://openclaw:18789`. Used by n8n via `/v1/responses`.
 
-5. **Workflow Builder** (`WF_20_Builder_Create_Workflow_via_API.json`)
-   - OpenClaw generates n8n workflow JSON on demand
-   - n8n validates + applies it via `POST /api/v1/workflows`
-   - Allows OpenClaw to create/modify n8n workflows programmatically
-   - See [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md)
+**Capabilities:**
+- **Web Intelligence:** Deep research, scraping (used by `WF_48`).
+- **Software Building:** Orchestrates the "Spec Kit" lifecycle (used by `WF_30`/`WF_49`).
+- **UI Automation:** Robust "Plan/Apply/Verify" for web UIs.
 
-6. **Analytics Reader** (planned)
-   - n8n reads `analytics.*` tables (written by MindsDB federated queries) and
-     pushes reports/insights to Telegram or dashboards
+### Telegram (Interface)
+The unified front-end. Supports:
+- Voice messages (transcribed by Gemini in `WF_42`).
+- Text interaction.
+- Approval Buttons (Action Draft Protocol).
 
-### OpenClaw (AI Agent Gateway = Brain + Hands + Eyes)
-
-[OpenClaw](https://docs.openclaw.ai/) is a **self-hosted AI agent gateway**.
-It wraps LLM providers (Anthropic Claude, etc.) and adds agent capabilities:
-tools (web browsing, scraping, code execution), sessions, skills, and
-multi-agent routing. **Jackie** is the agent persona configured in OpenClaw
-(with her own workspace, identity, and session store).
-
-n8n uses OpenClaw's HTTP API (`/v1/responses`) as the brain for its AI Agent
-workflows. All systems share the same memory: the `rag.*` schema in PostgreSQL.
-n8n reads/writes it via SQL, OpenClaw accesses it via n8n webhook APIs
-(`/webhook/memory-upsert`, `/webhook/memory-search`).
-
-n8n calls OpenClaw whenever it needs thinking, seeing, or acting.
-
-**🧠 Brain (Reasoning):**
-- LLM-powered reasoning and decision-making
-- Conversational AI with injected RAG context and memory
-- Produces structured responses with action tokens
-- Decides when to answer directly, browse the web, or trigger a project build
-
-**👁️ Eyes (Web Intelligence):**
-- Browse any website, read and extract content
-- Scrape social media (Twitter/X, LinkedIn, news sites, forums)
-- Monitor competitor activity, market trends, news
-- Fetch and summarize web pages on demand
-- Data collection for MindsDB analytics pipeline
-
-**🤲 Hands (Execution):**
-- **Spec Kit + GitHub**: Uses [Spec Kit](https://github.com/github/spec-kit)
-  (GitHub's spec-driven development toolkit) to properly define projects —
-  OpenClaw asks the user the right questions, helps them figure out requirements,
-  locks a complete specification, then delegates implementation to CLI tools
-  (Gemini CLI, Copilot CLI) which receive correct instructions from the start.
-  OpenClaw evaluates results and creates PRs
-- **n8n Workflow Builder**: Generate workflow JSON, create/modify/activate
-  workflows via n8n REST API — no manual UI clicking needed
-- **UI Operator**: PLAN → APPLY → VERIFY protocol for any web UI
-  (n8n editor, MindsDB, admin panels)
-- **Action Draft Protocol**: For risky actions, proposes a draft and waits
-  for human approval via Telegram before executing
-
-**Connection:** `http://openclaw:18789` (internal Docker DNS)
-⚠️ **Internal-only** — no public ports; always behind auth token
-
-#### UI Operator Protocol (PLAN → APPLY → VERIFY)
-
-When OpenClaw operates on a UI (n8n editor, MindsDB, dashboards):
-
-1. **PLAN** — OpenClaw returns what it will do step-by-step, how it verifies success, and what artifacts it exports
-2. **APPLY** — Performs the actual UI changes (clicks, fills, submits)
-3. **VERIFY** — Re-opens the UI, confirms the end-state matches expectations, exports proof (workflow JSON, screenshot, etc.)
-
-In n8n, add a gate after VERIFY:
-- User gets a Telegram report + exported artifact
-- One-click "✅ Approve" to activate/deploy the result
-- Until approved, the change is staged but not live
-
-See [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) for HTTP call shapes.
-
-### MindsDB (Federated Query Engine for AI)
-
-[MindsDB](https://github.com/mindsdb/mindsdb) is a **Federated Query Engine for AI** —
-it connects hundreds of data sources (databases, APIs, SaaS apps), unifies them
-via knowledge bases and views (no-ETL), and responds from the unified data
-via built-in agents and a built-in MCP server. Its core philosophy:
-**Connect → Unify → Respond.**
-
-In janAGI, MindsDB operates as a background data federation and analytics layer
-that does **not** interfere with live chat:
-
-**1. External Data Federation & BI (primary purpose):**
-- Connect to multiple data sources: Postgres (`rag.*`), external APIs,
-  web scraping results, CRM, e-commerce databases
-- Unify data via knowledge bases and views — no ETL pipelines needed
-- Build ML models over combined datasets (`CREATE MODEL ... PREDICT ...`)
-- Power dashboards and automated reports via built-in agents
-
-**2. Internal Operational Analytics:**
-- Conversation trend detection (daily topic/keyword aggregation)
-- Usage patterns and engagement metrics
-- Memory optimization signals (what to keep, what to archive)
-
-**How it works:**
-- Connects to Postgres as a federated data source (`mindsdb_ro` role)
-- Also connects to external APIs and databases directly (its core strength)
-- OpenClaw feeds external data (scraped content, browsing data) into
-  `rag.events` / `rag.artifacts` via n8n workflows
-- MindsDB unifies this data with external sources and writes results
-  to `analytics.*` tables via scheduled jobs
-- n8n reads `analytics.*` and pushes reports/insights to Telegram
-- UI on port `47334`, MySQL API on `47335`, HTTP API on `47336`
-- Built-in MCP server for AI integrations
-- See [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md)
-
-### Telegram (Interface Layer)
-Primary user interface:
-- Receives messages, forwards to Chat Orchestrator
-- Displays responses, approval buttons
-- Supports callback queries for Action Draft protocol
+---
 
 ## Data Flow
 
-### Chat with Memory (WF_40)
+### The V2 Router Architecture
 
 ```mermaid
 sequenceDiagram
     participant U as User (Telegram)
-    participant N as n8n (Integrator)
-    participant DB as PostgreSQL
-    participant AI as OpenClaw/Jackie (Brain)
+    participant R as Router (WF_42)
+    participant H as Handler (Chat/Web/Dev...)
+    participant AI as OpenClaw
 
-    U->>N: Message
-    N->>DB: start_run_for_thread()
-    N->>DB: log_event('user')
-    N->>DB: search_chunks(query)
-    DB-->>N: Related context
-    N->>AI: Prompt + context
-    AI-->>N: Response + actions
-    N->>DB: log_event('assistant')
+    U->>R: Message (Text/Voice)
+    R->>R: Transcribe & Classify
     
-    alt Has [[MEMORY: ...]]
-        N->>DB: Embed + INSERT into rag.chunks
+    alt Intent = WEB
+        R->>H: Invoke WF_48 (Web)
+    else Intent = DEV
+        R->>H: Invoke WF_49 (SpecKit)
+    else Intent = CHAT
+        R->>H: Invoke WF_46 (Chat)
     end
-    
-    alt Has [ACTION_DRAFT]
-        N->>U: Approval request (Telegram buttons)
-        U->>N: ✅ Approve
-        N->>AI: Execute action (web browse/scrape/fetch)
-        AI-->>N: Result + artifact
-        N->>DB: INSERT rag.artifacts
-        N->>U: Action result
-    end
-    
-    alt Has [[TRIGGER_SPEC: ...]]
-        N->>N: Trigger Spec-Kit sub-workflow
-    end
-    
-    N->>U: Reply
-    N->>DB: finish_run('success')
+
+    H->>AI: Execute Task (Think/Browsing)
+    AI-->>H: Result / Action Draft
+    H->>U: Final Reply
 ```
 
-### Web Intelligence Flow (WF_41)
+### Software Build Flow (Dev Capability)
 
 ```mermaid
 sequenceDiagram
-    participant U as User (Telegram)
-    participant N as n8n (Integrator)
-    participant AI as OpenClaw (Eyes+Hands)
-    participant W as Website / Social Media
-    participant DB as PostgreSQL
-    participant M as MindsDB
+    participant U as User
+    participant INT as WF_49 (Interface)
+    participant ENG as WF_30 (Engine)
+    participant AI as OpenClaw
 
-    U->>N: "Check competitor prices on X"
-    N->>U: [ACTION_DRAFT] Browse X, scrape prices
-    U->>N: ✅ Approve
-    N->>AI: Execute web task
-    AI->>W: Browse / scrape / extract
-    W-->>AI: Raw content
-    AI-->>N: Structured result
-    N->>DB: Store in rag.artifacts + rag.events
-    N->>U: Summary reply
-    Note over M,DB: MindsDB later connects this data<br/>with other sources (Unify) for federated analytics
+    U->>INT: "Build a React App"
+    INT->>AI: Refine Spec (Chat Loop)
+    AI-->>U: Questions?
+    U->>INT: Answers
+    INT->>ENG: Trigger Webhook (Locked Spec)
+    
+    par Parallel Build
+        ENG->>AI: Agent A (Gemini)
+        ENG->>AI: Agent B (Copilot)
+    end
+    
+    AI-->>ENG: PR Created
+    ENG->>U: "Ready: github.com/.../pull/1"
 ```
 
-### Project Build Flow (Spec Kit)
+## Networking
 
-```mermaid
-sequenceDiagram
-    participant U as User (Telegram)
-    participant N as n8n (Integrator)
-    participant AI as OpenClaw (Brain+Hands)
-    participant CLI as CLI Tools (Gemini/Copilot)
-    participant GH as GitHub
+| Service | Internal Hostname | Exposed? |
+|---------|-------------------|----------|
+| `janagi-db` | `janagi-db` | No |
+| `n8n` | `n8n` | Yes (Webhooks) |
+| `openclaw` | `openclaw` | No |
+| `mindsdb` | `mindsdb` | No |
 
-    U->>N: "Build me a FastAPI app for..."
-    N->>AI: REFINE (Spec-Kit questions)
-    AI-->>N: Questions
-    N->>U: Questions via Telegram
-    U->>N: Answers
-    N->>AI: Lock spec → locked.json
-    AI->>GH: Create repo, specify init
-    AI->>CLI: Invoke with locked.json + DoD
-    CLI->>GH: Commits (constitution→spec→plan→tasks→code)
-    CLI-->>AI: Status (green/red)
-    AI->>GH: Evaluate, pick winner, create PR
-    AI-->>N: Result + PR URL
-    N->>U: "✅ PR ready: github.com/.../pull/1"
-```
-
-## Networking (Coolify Docker Stack)
-
-All services communicate via internal Docker DNS. **No service should be reachable publicly
-except n8n webhooks** (which Coolify proxies via HTTPS).
-
-### Stable Hostnames (Recommended Coolify Resource Names)
-
-| Resource Name | Internal Hostname | Exposed Publicly? |
-|---------------|-------------------|-------------------|
-| `janagi-db` | `janagi-db` | ❌ No |
-| `n8n` | `n8n` | ✅ Yes (webhooks via Coolify proxy) |
-| `openclaw` | `openclaw` | ❌ No (internal-only, auth required) |
-| `mindsdb` | `mindsdb` | ❌ No (or admin-only) |
-
-> **Tip:** Rename Coolify resources to short names. Coolify uses the resource name
-> as the container hostname. Random suffixes like `mindsdb-wc88...` work but are painful to debug.
-
-### Internal DNS Routes
-
-| From | To | URL |
-|------|----|-----|
-| n8n | janagi DB | `janagi-db:5432` |
-| n8n | OpenClaw | `http://openclaw:18789` |
-| n8n | MindsDB | `mindsdb:47335` (MySQL API) |
-| OpenClaw | n8n | `http://n8n:5678` |
-| OpenClaw | n8n API | `http://n8n:5678/api/v1/` |
-| MindsDB | janagi DB | `janagi-db:5432` (read-only) |
-
-> `postgres` (docker-compose service name) resolves via Docker DNS.
-> In Coolify, rename the Postgres resource to `janagi-db` for the same effect.
-> n8n's own internal DB can be a separate database on the same instance (Coolify)
-> or the same `janagi` database (docker-compose dev).
-
-### Verify DNS from Inside a Container
-
-```bash
-# In Coolify: open Terminal for the n8n container, then:
-getent hosts openclaw
-getent hosts mindsdb
-getent hosts janagi-db
-ping -c 1 openclaw
-```
-
-If DNS doesn't resolve, the services are not in the same Docker network
-or the resource name doesn't match. Fix in Coolify → Settings → Networks.
-
-**Important**: Never use `localhost` between containers. Coolify manages the network.
-
-## Multi-tenant Support
-- Every piece of data is scoped to `client_id` + `project_id`
-- Default client: `janagi`, default project: `janagi`
-- New tenants = new rows in `rag.clients` / `rag.projects`
-
-## Agent Architecture Pattern
-
-The system follows a **"n8n integrates, OpenClaw is the agent gateway"** pattern.
-[n8n](https://github.com/n8n-io/n8n) is a fair-code workflow automation platform
-with native AI capabilities. All systems share the same memory (`rag.*` in PostgreSQL).
-
-```
-┌──────────────────────────────────────────────────────────┐
-│   n8n (Fair-code Workflow Automation + AI Agents)        │
-│   400+ integrations, LangChain AI agents, JS/Python     │
-│   Telegram ↔ DB logging ↔ Safety gates ↔ Routing         │
-│   AI Agent node calls OpenClaw /v1/responses             │
-│   Decides NOTHING — routes to the right sub-workflow     │
-├──────────────────────────────────────────────────────────┤
-│             OpenClaw (AI Agent Gateway)                  │
-│      LLM (Anthropic Claude, etc.) + Agent Tools          │
-│             Jackie = agent persona                       │
-├──────────────┬───────────────┬──────────────┬─────────────┤
-│ 🧠 Chat &    │ 👁️ Web        │ 🤲 Spec Kit  │ 🤲 Workflow  │
-│ Reasoning   │ Browse /     │ (Spec-     │ Builder    │
-│ (LLM +      │ Scrape /     │ Driven     │ (n8n API)  │
-│  Memory)    │ Social Media │ Dev)       │            │
-├──────────────┼───────────────┼──────────────┼─────────────┤
-│              │               │              │             │
-│ CLI Tools:   │ Data feeds:   │ Gemini CLI   │ n8n REST    │
-│ (Gemini,     │ → rag.events  │ Copilot CLI  │ API         │
-│  Copilot)    │ → rag.artifacts│              │             │
-└──────────────┴───────────────┴──────────────┴─────────────┘
-                        │
-              ┌─────────┴────────────────────┐
-              │ MindsDB                    │
-              │ (Federated Query Engine)    │
-              │                              │
-              │ Connect: 100s of data        │
-              │ sources (DBs, APIs, SaaS)    │
-              │ Unify: knowledge bases,      │
-              │ views, jobs (no-ETL)          │
-              │ Respond: built-in agents     │
-              │ + MCP server                  │
-              │                              │
-              │ janAGI: data federation      │
-              │ + analytics (connect PG +     │
-              │ external → unified insights)  │
-              └──────────────────────────────┘
-```
-
-OpenClaw is the **sole agent gateway** — either:
-- Directly in the main AI Agent node via `/v1/responses`, or
-- As a separate sub-workflow (`WF_41`) that the main agent triggers via ACTION_DRAFT
-
-n8n **never thinks** — it only integrates, logs, gates, and routes.
-All systems share the same memory (`rag.*` schema in PostgreSQL).
+All communication occurs via the internal Docker network.

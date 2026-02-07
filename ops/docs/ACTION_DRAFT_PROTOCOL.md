@@ -44,11 +44,14 @@ Telegram formatting often breaks JSON. The safest pattern is to embed payload be
 
 ## 3) n8n implementation (minimal)
 
-### Workflow A — Draft (LLM produces a draft + asks for approval)
-1) Telegram Trigger
-2) AI Agent outputs either a normal answer OR `[ACTION_DRAFT]` + JSON
-3) Code node: parse the draft & normalize JSON
-4) If draft exists → send Telegram approval message with markers + buttons
+### Workflow A — Draft Generation (Inside Handlers)
+
+**Context:** The Router (`WF_42`) has already identified the intent (e.g. `TASK`, `WEB_SEARCH`) and routed to a specific handler (e.g., `WF_44`, `WF_48`).
+
+1.  **Handler Execution:** The specific agent (e.g., Web Researcher) determines an action is needed.
+2.  **Output:** It outputs `[ACTION_DRAFT]` + JSON payload.
+3.  **Code Node:** Parses draft & normalizes JSON.
+4.  **Approval Request:** Sends Telegram message with buttons.
 
 ### Workflow B — Execute on Approve
 1) Telegram callback query trigger (Approve)
