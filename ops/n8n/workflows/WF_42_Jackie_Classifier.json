@@ -3,13 +3,18 @@
   "nodes": [
     {
       "parameters": {
-        "updates": ["message"],
+        "updates": [
+          "message"
+        ],
         "additionalFields": {}
       },
       "id": "c42-trigger",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
-      "position": [-1200, 300],
+      "position": [
+        -1280,
+        300
+      ],
       "webhookId": "wf42-telegram-trigger",
       "typeVersion": 1,
       "credentials": {
@@ -42,7 +47,10 @@
       "id": "c42-voicetext",
       "name": "Voice or Text",
       "type": "n8n-nodes-base.set",
-      "position": [-960, 300],
+      "position": [
+        -1080,
+        300
+      ],
       "typeVersion": 3.2
     },
     {
@@ -73,7 +81,10 @@
       "id": "c42-if",
       "name": "If text empty",
       "type": "n8n-nodes-base.if",
-      "position": [-720, 300],
+      "position": [
+        -880,
+        300
+      ],
       "typeVersion": 2.2
     },
     {
@@ -85,7 +96,10 @@
       "id": "c42-getvoice",
       "name": "Get Voice File",
       "type": "n8n-nodes-base.telegram",
-      "position": [-480, 160],
+      "position": [
+        -680,
+        140
+      ],
       "webhookId": "wf42-voice",
       "typeVersion": 1.1,
       "credentials": {
@@ -110,7 +124,10 @@
       "id": "c42-transcribe",
       "name": "Transcribe",
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "position": [-240, 160],
+      "position": [
+        -480,
+        140
+      ],
       "typeVersion": 1,
       "credentials": {
         "googlePalmApi": {
@@ -142,12 +159,138 @@
       "id": "c42-mergefields",
       "name": "Set transcribed text",
       "type": "n8n-nodes-base.set",
-      "position": [0, 160],
+      "position": [
+        -280,
+        140
+      ],
       "typeVersion": 3.2
     },
     {
       "parameters": {
-        "inputText": "={{ $json.text }}",
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $json.chat_id || $('Voice or Text').item.json.chat_id }}"
+            },
+            {
+              "name": "user_id",
+              "stringValue": "={{ $json.user_id || $('Voice or Text').item.json.user_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-context",
+      "name": "Prepare Context",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -100,
+        300
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{ $json.chat_id }}'::text,\n  'classifier',\n  ('Classifier ' || '{{ $json.chat_id }}')::text,\n  '{}'::jsonb,\n  '{}'::jsonb\n);\n",
+        "options": {}
+      },
+      "id": "c42-startrun",
+      "name": "Start Run",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        100,
+        300
+      ],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $json.conversation_id }}'::uuid,\n  '{{ $json.run_id }}'::uuid,\n  'user',\n  '{{ $('Prepare Context').item.json.user_id }}'::text,\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'user',\n    'text', to_jsonb('{{ $('Prepare Context').item.json.text }}'::text),\n    'channel', 'telegram',\n    'category', 'pending'\n  )\n) AS event_id;\n",
+        "options": {}
+      },
+      "id": "c42-loguser",
+      "name": "Log User Msg",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        300,
+        300
+      ],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Prepare Context').item.json.chat_id }}",
+        "text": "👌 Prijato, pracuju na tom.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "c42-ack",
+      "name": "Telegram Ack",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        500,
+        300
+      ],
+      "webhookId": "wf42-ack",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BsEzRf2V5iDa2CvB",
+          "name": "Telegram account PN"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "mistral/mistral-large-latest"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "c42-llm-classifier",
+      "name": "Classifier LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        700,
+        500
+      ],
+      "typeVersion": 1.3,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputText": "={{ $('Prepare Context').item.json.text }}",
         "categories": {
           "categories": [
             {
@@ -187,402 +330,290 @@
       "id": "c42-classifier",
       "name": "Classify Intent",
       "type": "@n8n/n8n-nodes-langchain.textClassifier",
-      "position": [240, 300],
+      "position": [
+        700,
+        300
+      ],
       "typeVersion": 1.1
-    },
-    {
-      "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "id",
-          "value": "mistral/mistral-large-latest"
-        },
-        "responsesApiEnabled": false,
-        "options": {
-          "temperature": 0
-        }
-      },
-      "id": "c42-llm-classifier",
-      "name": "Classifier LLM",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "position": [240, 520],
-      "typeVersion": 1.3,
-      "credentials": {
-        "openAiApi": {
-          "id": "5lko0zqD9vqhajI4",
-          "name": "OpenAi account JH"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{ $json.chat_id }}'::text,\n  'classifier',\n  ('Classifier ' || '{{ $json.chat_id }}')::text,\n  '{}'::jsonb,\n  '{}'::jsonb\n);\n",
-        "options": {}
-      },
-      "id": "c42-startrun",
-      "name": "Start Run",
-      "type": "n8n-nodes-base.postgres",
-      "position": [520, 300],
-      "typeVersion": 2.6,
-      "credentials": {
-        "postgres": {
-          "id": "Y1VwNrsd2m68uUCQ",
-          "name": "Postgres account JH"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $json.conversation_id }}'::uuid,\n  '{{ $json.run_id }}'::uuid,\n  'user',\n  '{{ $('Voice or Text').item.json.user_id }}'::text,\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'user',\n    'text', to_jsonb('{{ $('Classify Intent').item.json.text }}'::text),\n    'channel', 'telegram',\n    'category', '{{ $('Classify Intent').item.json.categorized_to || \"unknown\" }}'\n  )\n) AS event_id;\n",
-        "options": {}
-      },
-      "id": "c42-loguser",
-      "name": "Log User Msg",
-      "type": "n8n-nodes-base.postgres",
-      "position": [760, 300],
-      "typeVersion": 2.6,
-      "credentials": {
-        "postgres": {
-          "id": "Y1VwNrsd2m68uUCQ",
-          "name": "Postgres account JH"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "chatId": "={{ $('Voice or Text').item.json.chat_id }}",
-        "text": "👌 Prijato, pracuju na tom.",
-        "additionalFields": {
-          "appendAttribution": false
-        }
-      },
-      "id": "c42-ack",
-      "name": "Telegram Ack",
-      "type": "n8n-nodes-base.telegram",
-      "position": [920, 140],
-      "webhookId": "wf42-ack",
-      "typeVersion": 1.1,
-      "credentials": {
-        "telegramApi": {
-          "id": "BsEzRf2V5iDa2CvB",
-          "name": "Telegram account PN"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c42-if-meeting",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
-              "rightValue": "MEETING"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c42-if-meeting",
-      "name": "If category MEETING",
-      "type": "n8n-nodes-base.if",
-      "position": [1040, 140],
-      "typeVersion": 2.2
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c42-if-task",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
-              "rightValue": "TASK"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c42-if-task",
-      "name": "If category TASK",
-      "type": "n8n-nodes-base.if",
-      "position": [1040, 300],
-      "typeVersion": 2.2
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c42-if-email",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
-              "rightValue": "EMAIL"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c42-if-email",
-      "name": "If category EMAIL",
-      "type": "n8n-nodes-base.if",
-      "position": [1040, 460],
-      "typeVersion": 2.2
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c42-if-chat",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
-              "rightValue": "CHAT"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c42-if-chat",
-      "name": "If category CHAT",
-      "type": "n8n-nodes-base.if",
-      "position": [1040, 620],
-      "typeVersion": 2.2
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c42-if-web",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
-              "rightValue": "WEB"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c42-if-web",
-      "name": "If category WEB",
-      "type": "n8n-nodes-base.if",
-      "position": [1040, 780],
-      "typeVersion": 2.2
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "leftValue": "",
-            "caseSensitive": false,
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c42-if-dev",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              },
-              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
-              "rightValue": "DEV"
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c42-if-dev",
-      "name": "If category DEV",
-      "type": "n8n-nodes-base.if",
-      "position": [1040, 940],
-      "typeVersion": 2.2
     },
     {
       "id": "c42-exec-meeting",
       "name": "Execute Meeting WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 60],
+      "position": [
+        1100,
+        60
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_43 Jackie Meeting" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_43 Jackie Meeting"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
       "id": "c42-exec-task",
       "name": "Execute Task WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 220],
+      "position": [
+        1100,
+        220
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_44 Jackie Task" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_44 Jackie Task"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
       "id": "c42-exec-email",
       "name": "Execute Email WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 380],
+      "position": [
+        1100,
+        380
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_45 Jackie Email" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_45 Jackie Email"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
       "id": "c42-exec-chat",
       "name": "Execute Chat WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 540],
+      "position": [
+        1100,
+        540
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_46 Jackie Chat" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_46 Jackie Chat"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
       "id": "c42-exec-web",
       "name": "Execute Web WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 700],
+      "position": [
+        1100,
+        700
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_48 Jackie Web" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_48 Jackie Web"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
       "id": "c42-exec-spec",
       "name": "Execute SpecKit WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 860],
+      "position": [
+        1100,
+        860
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_49 Jackie SpecKit" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_49 Jackie SpecKit"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
       "id": "c42-exec-unknown",
       "name": "Execute Clarify WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 1020],
+      "position": [
+        1100,
+        1020
+      ],
       "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "WF_47 Jackie Clarify" },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "WF_47 Jackie Clarify"
+        },
         "fields": {
           "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
           ]
         },
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       }
     },
     {
@@ -594,7 +625,10 @@
       "id": "c42-logbot",
       "name": "Log Bot Msg",
       "type": "n8n-nodes-base.postgres",
-      "position": [1640, 300],
+      "position": [
+        1400,
+        300
+      ],
       "typeVersion": 2.6,
       "credentials": {
         "postgres": {
@@ -612,7 +646,10 @@
       "id": "c42-finish",
       "name": "Finish Run",
       "type": "n8n-nodes-base.postgres",
-      "position": [1880, 300],
+      "position": [
+        1600,
+        300
+      ],
       "typeVersion": 2.6,
       "credentials": {
         "postgres": {
@@ -623,7 +660,7 @@
     },
     {
       "parameters": {
-        "chatId": "={{ $('Voice or Text').item.json.chat_id }}",
+        "chatId": "={{ $('Prepare Context').item.json.chat_id }}",
         "text": "={{ $('Log Bot Msg').item.json.output || $json.output || 'Omlouvám se, něco se pokazilo.' }}",
         "additionalFields": {
           "appendAttribution": false,
@@ -633,7 +670,10 @@
       "id": "c42-reply",
       "name": "Telegram Reply",
       "type": "n8n-nodes-base.telegram",
-      "position": [2120, 300],
+      "position": [
+        1800,
+        300
+      ],
       "webhookId": "wf42-reply",
       "typeVersion": 1.1,
       "credentials": {
@@ -649,215 +689,280 @@
     "Telegram Trigger": {
       "main": [
         [
-          { "node": "Voice or Text", "type": "main", "index": 0 }
+          {
+            "node": "Voice or Text",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Voice or Text": {
       "main": [
         [
-          { "node": "If text empty", "type": "main", "index": 0 }
+          {
+            "node": "If text empty",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "If text empty": {
       "main": [
         [
-          { "node": "Get Voice File", "type": "main", "index": 0 }
+          {
+            "node": "Get Voice File",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "Classify Intent", "type": "main", "index": 0 }
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Get Voice File": {
       "main": [
         [
-          { "node": "Transcribe", "type": "main", "index": 0 }
+          {
+            "node": "Transcribe",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Transcribe": {
       "main": [
         [
-          { "node": "Set transcribed text", "type": "main", "index": 0 }
+          {
+            "node": "Set transcribed text",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Set transcribed text": {
       "main": [
         [
-          { "node": "Classify Intent", "type": "main", "index": 0 }
+          {
+            "node": "Prepare Context",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
-    "Classifier LLM": {
-      "ai_languageModel": [
-        [
-          { "node": "Classify Intent", "type": "ai_languageModel", "index": 0 }
-        ]
-      ]
-    },
-    "Classify Intent": {
+    "Prepare Context": {
       "main": [
         [
-          { "node": "Start Run", "type": "main", "index": 0 }
-        ],
-        [
-          { "node": "Start Run", "type": "main", "index": 0 }
-        ],
-        [
-          { "node": "Start Run", "type": "main", "index": 0 }
-        ],
-        [
-          { "node": "Start Run", "type": "main", "index": 0 }
-        ],
-        [
-          { "node": "Start Run", "type": "main", "index": 0 }
+          {
+            "node": "Start Run",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Start Run": {
       "main": [
         [
-          { "node": "Log User Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log User Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Log User Msg": {
       "main": [
         [
-          { "node": "Telegram Ack", "type": "main", "index": 0 }
+          {
+            "node": "Telegram Ack",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Telegram Ack": {
       "main": [
         [
-          { "node": "If category MEETING", "type": "main", "index": 0 }
+          {
+            "node": "Classify Intent",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
-    "If category MEETING": {
-      "main": [
+    "Classifier LLM": {
+      "ai_languageModel": [
         [
-          { "node": "Execute Meeting WF", "type": "main", "index": 0 }
-        ],
-        [
-          { "node": "If category TASK", "type": "main", "index": 0 }
+          {
+            "node": "Classify Intent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
         ]
       ]
     },
-    "If category TASK": {
+    "Classify Intent": {
       "main": [
         [
-          { "node": "Execute Task WF", "type": "main", "index": 0 }
+          {
+            "node": "Execute Meeting WF",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "If category EMAIL", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "If category EMAIL": {
-      "main": [
-        [
-          { "node": "Execute Email WF", "type": "main", "index": 0 }
+          {
+            "node": "Execute Task WF",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "If category CHAT", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "If category CHAT": {
-      "main": [
-        [
-          { "node": "Execute Chat WF", "type": "main", "index": 0 }
+          {
+            "node": "Execute Email WF",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "If category WEB", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "If category WEB": {
-      "main": [
-        [
-          { "node": "Execute Web WF", "type": "main", "index": 0 }
+          {
+            "node": "Execute Chat WF",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "If category DEV", "type": "main", "index": 0 }
-        ]
-      ]
-    },
-    "If category DEV": {
-      "main": [
-        [
-          { "node": "Execute SpecKit WF", "type": "main", "index": 0 }
+          {
+            "node": "Execute Web WF",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "Execute Clarify WF", "type": "main", "index": 0 }
+          {
+            "node": "Execute SpecKit WF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Clarify WF",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute Meeting WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute Task WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute Email WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute Chat WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute Web WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute SpecKit WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Execute Clarify WF": {
       "main": [
         [
-          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+          {
+            "node": "Log Bot Msg",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Log Bot Msg": {
       "main": [
         [
-          { "node": "Finish Run", "type": "main", "index": 0 }
+          {
+            "node": "Finish Run",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Finish Run": {
       "main": [
         [
-          { "node": "Telegram Reply", "type": "main", "index": 0 }
+          {
+            "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     }
