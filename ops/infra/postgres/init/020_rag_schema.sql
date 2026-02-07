@@ -5,6 +5,11 @@
 -- Tables:  rag.clients, projects, conversations, runs, events, artifacts,
 --          sources, documents, chunks
 -- Functions: start_run_for_thread, log_event, finish_run, search_chunks
+-- View:    v_messages
+
+-- ==========================================
+-- 0. PREREQUISITES
+-- ==========================================
 
 CREATE SCHEMA IF NOT EXISTS rag;
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -54,7 +59,7 @@ CREATE TABLE IF NOT EXISTS rag.runs (
   client_id       uuid        REFERENCES rag.clients(id) ON DELETE CASCADE,
   project_id      uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
   conversation_id uuid        REFERENCES rag.conversations(id) ON DELETE SET NULL,
-  run_type        text        NOT NULL,           -- 'chat', 'web_fetch', 'web_search', 'spec_build'
+  kind            text        NOT NULL,           -- 'chat', 'web_fetch', 'web_search', 'spec_build'
   status          text        NOT NULL DEFAULT 'running', -- 'running', 'success', 'failed'
   summary         text,                            -- outcome description (set by finish_run)
   metadata        jsonb       NOT NULL DEFAULT '{}'::jsonb,
@@ -71,9 +76,9 @@ CREATE TABLE IF NOT EXISTS rag.events (
   project_id      uuid        REFERENCES rag.projects(id),
   conversation_id uuid        REFERENCES rag.conversations(id),
   actor_type      text        NOT NULL,            -- 'user', 'n8n', 'openclaw', 'system'
-  actor_name      text,                             -- 'ai_jackie', 'telegram', 'subwf:web'
+  actor_name      text,                            -- 'ai_jackie', 'telegram', 'subwf:web'
   event_type      text        NOT NULL,            -- 'message', 'tool_call', 'tool_result', 'error'
-  name            text,                             -- sub-type: 'approval', 'action_draft', 'openclaw', 'action_draft_sent'
+  name            text,                            -- sub-type: 'approval', 'action_draft', 'openclaw', 'action_draft_sent'
   payload         jsonb       NOT NULL DEFAULT '{}'::jsonb,
   ts              timestamptz NOT NULL DEFAULT now()
 );
@@ -88,7 +93,7 @@ CREATE TABLE IF NOT EXISTS rag.artifacts (
   run_id          uuid        REFERENCES rag.runs(id) ON DELETE CASCADE,
   kind            text        NOT NULL,            -- 'openclaw_web_result', 'locked.json', 'spec.md'
   title           text,
-  content_text    text,                             -- text content
+  content_text    text,                            -- text content
   metadata        jsonb       NOT NULL DEFAULT '{}'::jsonb,
   created_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -118,32 +123,46 @@ CREATE TABLE IF NOT EXISTS rag.documents (
 );
 
 -- Chunks (Vector store — RAG retrieval target)
+-- Uses vector() without fixed dimension — allows any embedding model.
 CREATE TABLE IF NOT EXISTS rag.chunks (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id uuid        REFERENCES rag.documents(id) ON DELETE CASCADE,
   project_id  uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
   content     text        NOT NULL,
-  embedding   vector(1536),                        -- OpenAI text-embedding-3-small
+  embedding   vector,                              -- flexible: any embedding model / dimension
   chunk_index int,
   metadata    jsonb       NOT NULL DEFAULT '{}'::jsonb,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 
 -- ==========================================
--- 3. INDEXES
+-- 3. VIEW
 -- ==========================================
 
--- Vector search (HNSW for fast approximate nearest neighbor)
-CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw
-  ON rag.chunks USING hnsw (embedding vector_cosine_ops);
+-- Convenience view: human-readable message log
+CREATE OR REPLACE VIEW rag.v_messages AS
+  SELECT
+    id, ts, client_id, project_id, conversation_id, run_id,
+    actor_type,
+    payload->>'role'  AS role,
+    payload->>'text'  AS text
+  FROM rag.events
+  WHERE event_type = 'message';
+
+-- ==========================================
+-- 4. INDEXES
+-- ==========================================
+
+-- Vector search: HNSW requires fixed-dimension column.
+-- Create AFTER first data insert when you know the embedding dimension:
+--   CREATE INDEX idx_chunks_embedding_hnsw
+--     ON rag.chunks USING hnsw (embedding vector_cosine_ops);
 
 -- Events: history loading (WF_40 "Load history" node)
--- WHERE conversation_id = ... AND event_type = 'message' ORDER BY ts DESC
 CREATE INDEX IF NOT EXISTS idx_events_conv_type_ts
   ON rag.events (conversation_id, event_type, ts DESC);
 
--- Events: action draft lookup (WF_41 "Start SubRun" node)
--- WHERE event_type = 'tool_result' AND name = 'action_draft_sent'
+-- Events: action draft lookup (WF_41 CTEs)
 CREATE INDEX IF NOT EXISTS idx_events_type_name
   ON rag.events (event_type, name);
 
@@ -160,7 +179,7 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_run
   ON rag.artifacts (run_id, created_at);
 
 -- ==========================================
--- 4. FUNCTIONS
+-- 5. FUNCTIONS
 -- ==========================================
 
 -- FUNCTION: start_run_for_thread
@@ -195,13 +214,13 @@ BEGIN
 
   IF v_conv_id IS NULL THEN
     INSERT INTO rag.conversations (client_id, project_id, channel, thread_key, title, metadata)
-    VALUES (p_client_id, p_project_id, p_channel, p_thread_key, p_title, p_conv_meta)
-    RETURNING id INTO v_conv_id;
+      VALUES (p_client_id, p_project_id, p_channel, p_thread_key, p_title, p_conv_meta)
+      RETURNING id INTO v_conv_id;
     v_is_new := true;
   END IF;
 
   -- 2. Create run
-  INSERT INTO rag.runs (client_id, project_id, conversation_id, run_type, metadata)
+  INSERT INTO rag.runs (client_id, project_id, conversation_id, kind, metadata)
   VALUES (p_client_id, p_project_id, v_conv_id, p_kind, p_run_meta)
   RETURNING id INTO v_run_id;
 
@@ -254,7 +273,6 @@ $$;
 
 -- FUNCTION: finish_run
 -- Used by WF_41 "Finish run" node.
--- Accepts optional summary text and metadata merge.
 CREATE OR REPLACE FUNCTION rag.finish_run(
   p_run_id   uuid,
   p_status   text  DEFAULT 'completed',
@@ -281,7 +299,7 @@ $$;
 -- Used by memory_workflows.json "Postgres Search" node.
 CREATE OR REPLACE FUNCTION rag.search_chunks(
   p_project_key     text,
-  p_embedding       vector(1536),
+  p_embedding       vector,
   p_match_threshold float,
   p_match_count     int
 )
@@ -298,7 +316,7 @@ BEGIN
   SELECT
     c.id,
     c.content,
-    1 - (c.embedding <=> p_embedding) AS similarity,
+    (1 - (c.embedding <=> p_embedding))::float AS similarity,
     c.metadata
   FROM rag.chunks c
   JOIN rag.projects p ON c.project_id = p.id
@@ -308,3 +326,21 @@ BEGIN
   LIMIT p_match_count;
 END;
 $$;
+
+-- ==========================================
+-- 6. SEED DATA
+-- ==========================================
+-- These UUIDs are hardcoded in WF_40 and WF_41.
+
+INSERT INTO rag.clients (id, client_key, name)
+VALUES ('781594f6-132b-4d47-9933-6499223dbd56', 'default', 'Default')
+ON CONFLICT (client_key) DO NOTHING;
+
+INSERT INTO rag.projects (id, client_id, project_key, name)
+VALUES (
+  '56c83308-384e-4e27-8893-2aa46b845851',
+  '781594f6-132b-4d47-9933-6499223dbd56',
+  'janagi',
+  'janAGI'
+)
+ON CONFLICT (client_id, project_key) DO NOTHING;
