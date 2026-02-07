@@ -23,80 +23,45 @@ n8n (as the integrator) uses Postgres nodes to call stored functions:
 - `rag.search_chunks()` — Semantic search over knowledge base
 - `rag.finish_run()` — Close session (with optional summary + metadata)
 
-### From OpenClaw (Agent Gateway → via n8n Webhooks)
-OpenClaw (the AI agent gateway running Jackie) cannot access the database
-directly. It uses HTTP webhooks provided by n8n:
-- `POST /webhook/memory-upsert` — Store new knowledge (e.g. scraped web data, facts)
-- `POST /webhook/memory-search` — Query existing knowledge before making decisions
+### From OpenClaw (Agent Gateway)
+In the V2 architecture, OpenClaw runs as a stateless "Brain". It does not access the database directly or via webhooks. Instead, **n8n (the Router)** is responsible for:
+1.  **Retrieval:** Fetching relevant context via `rag.search_chunks()` *before* calling the agent.
+2.  **Storage:** Logging the conversation to `rag.events`.
+3.  **Upsert:** Long-term memory storage is currently handled by n8n workflows (e.g. `WF_34` or manual tools), not by the agent directly calling webhooks.
 
-## Workflow: Chat with Memory
+## Workflow: Chat with Memory (V2 Router)
 
 ```mermaid
 sequenceDiagram
     participant U as Telegram User
-    participant N as n8n (Integrator)
+    participant N as n8n (Router WF_42)
     participant DB as PostgreSQL
-    participant AI as OpenClaw (Agent Gateway)
+    participant AI as OpenClaw (Brain)
 
     U->>N: Message
-    N->>DB: rag.start_run_for_thread(client_id, project_id, 'telegram', chat_id, 'chat', ...)
-    N->>DB: rag.log_event(client_id, project_id, conv_id, run_id, 'user', from_id, 'message', NULL, payload)
-    N->>DB: rag.search_chunks('janagi', embed(text), 0.5, 5)
+    N->>DB: rag.start_run_for_thread(...)
+    N->>DB: rag.log_event(..., 'user', ...)
+    
+    note right of N: Context Building
+    N->>DB: rag.search_chunks(query, ...)
     DB-->>N: Top-K relevant chunks
-    N->>AI: System prompt + context + user message
-    AI-->>N: Response (may include [[MEMORY: ...]])
-    N->>DB: rag.log_event(..., 'n8n', 'ai_jackie', 'message', NULL, payload)
+    N->>DB: rag.events (fetch recent history)
     
-    opt Agent extracted a fact
-        N->>DB: INSERT INTO rag.chunks (embed + store)
-    end
+    N->>AI: System Prompt + History + Context + User Msg
+    AI-->>N: Response (Text + Tool Calls)
     
-    N->>U: Telegram reply
-    N->>DB: rag.finish_run(run_id, 'success')
+    N->>DB: rag.log_event(..., 'ai', response)
+    N->>U: Telegram Reply
+    N->>DB: rag.finish_run(...)
 ```
 
-## Workflow: Memory Upsert (Webhook API)
+## Memory Management (Future)
 
-**Endpoint**: `POST /webhook/memory-upsert`
-
-```json
-{
-  "content": "Coolify requires pgvector image for vector support.",
-  "namespace": "janagi",
-  "metadata": { "source": "chat_extraction", "chat_id": "123" }
-}
-```
-
-**Process**:
-1. Receive content via webhook
-2. Generate embedding via OpenAI `text-embedding-3-small` (1536 dimensions)
-3. Format embedding array as string for pgvector
-4. `INSERT INTO rag.chunks` with project lookup by namespace
-
-## Workflow: Memory Search (Webhook API)
-
-**Endpoint**: `POST /webhook/memory-search`
-
-```json
-{
-  "query": "How do I deploy on Coolify?",
-  "namespace": "janagi",
-  "top_k": 5
-}
-```
-
-**Process**:
-1. Embed query text
-2. Call `rag.search_chunks(namespace, embedding, 0.5, top_k)`
-3. Return ranked results with similarity scores
+Future implementations (`WF_4X` series) will enable the agent to explicitly call tools to store "permanent facts" into `rag.chunks`. For now, all conversation history is automatically indexed in `rag.events`.
 
 ## Action Parsing
 
-The AI Agent can embed structured commands in its response:
-- `[[MEMORY: some fact]]` — Triggers memory upsert
-- `[[TRIGGER_SPEC: project-name]]` — Triggers Spec-Kit sub-workflow
-
-The n8n Code Node parses these tokens and routes accordingly.
+The AI Agent returns structured tool calls (OpenAI/Anthropic standard) or structured JSON. The "Magic Brackets" `[[MEMORY:...]]` syntax is deprecated in favor of explicit tool definitions.
 
 ## RAG Index Structure
 
