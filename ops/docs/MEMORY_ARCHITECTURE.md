@@ -13,26 +13,27 @@ Full column definitions: [DB_SCHEMA.md](DB_SCHEMA.md)
 
 ## Memory Access Patterns
 
-### From n8n (Direct SQL)
-n8n uses Postgres nodes to call stored functions:
+### From n8n (Integrator → Direct SQL)
+n8n (as the integrator) uses Postgres nodes to call stored functions:
 - `rag.start_run_for_thread()` — Initialize a session (resolves/creates conversation)
 - `rag.log_event()` — Record messages, tool calls, errors (9-arg version)
 - `rag.search_chunks()` — Semantic search over knowledge base
 - `rag.finish_run()` — Close session (with optional summary + metadata)
 
-### From OpenClaw (via n8n Webhooks)
-OpenClaw cannot access the database directly. It uses HTTP webhooks:
-- `POST /webhook/memory-upsert` — Store new knowledge
-- `POST /webhook/memory-search` — Query existing knowledge
+### From OpenClaw (Brain → via n8n Webhooks)
+OpenClaw (the brain) cannot access the database directly. It uses HTTP webhooks
+provided by n8n:
+- `POST /webhook/memory-upsert` — Store new knowledge (e.g. scraped web data, facts)
+- `POST /webhook/memory-search` — Query existing knowledge before making decisions
 
 ## Workflow: Chat with Memory
 
 ```mermaid
 sequenceDiagram
     participant U as Telegram User
-    participant N as n8n
+    participant N as n8n (Integrator)
     participant DB as PostgreSQL
-    participant AI as AI Agent
+    participant AI as OpenClaw/Jackie (Brain)
 
     U->>N: Message
     N->>DB: rag.start_run_for_thread(client_id, project_id, 'telegram', chat_id, 'chat', ...)

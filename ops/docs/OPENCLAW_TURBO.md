@@ -1,14 +1,17 @@
 # OpenClaw Turbo (HTTP) for n8n
 
-OpenClaw Gateway can expose 3 useful HTTP surfaces:
+OpenClaw is the system’s **brain, hands, and eyes** — n8n (integrator) calls it
+via HTTP whenever it needs thinking, web browsing, scraping, or execution.
 
-- `POST /v1/responses` (OpenResponses-compatible) – **recommended** for “run an agent to do a task”
+OpenClaw Gateway exposes 3 HTTP surfaces:
+
+- `POST /v1/responses` (OpenResponses-compatible) – **recommended** for "run an agent to do a task"
 - `POST /v1/chat/completions` (OpenAI-compatible) – optional
 - `POST /tools/invoke` – invoke **one tool** directly (debug / low-level ops)
 
 This repo is opinionated:
 
-✅ **Use `/v1/responses`** for most automation (web, browsing, UI operator, multi-step tasks).
+✅ **Use `/v1/responses`** for most automation (web browsing, scraping, social media, UI operator, project builds, multi-step tasks).
 🧰 Use `/tools/invoke` only when you *really* want a single tool call (and you know the tool name is allowed).
 
 ---

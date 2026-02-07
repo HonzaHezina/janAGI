@@ -1,13 +1,18 @@
 # Personal Assistant + Turbo (OpenClaw)
 
-Goal: Your **main assistant** lives in n8n (Telegram voice/text → LLM → tools).
-OpenClaw is the **Turbo**: it executes tasks that require *eyes + hands* (browser/UI, multi-step ops), and can also **verify** results.
+Goal: Your **main assistant** lives in n8n (Telegram voice/text → routing → response).
+n8n is the **integrator/curator** — it manages state, gates, and routing.
+OpenClaw (Jackie) is the **brain, hands, and eyes**:
+- **🧠 Brain**: LLM reasoning, decisions, conversation with memory
+- **👁️ Eyes**: browse websites, scrape content, read social media, monitor competitors
+- **🤲 Hands**: create GitHub projects (Spec Kit), write n8n workflows, execute approved actions
 
 ## Design principles
 
-1. **Main assistant stays deterministic**
-   - It decides *what* should happen.
-   - It records each decision as an event in your domain DB (`rag.events`).
+1. **n8n integrates, OpenClaw thinks**
+   - n8n routes requests to the right sub-workflow.
+   - OpenClaw decides *what* should happen and *does* it.
+   - Every decision is recorded as an event in your domain DB (`rag.events`).
 
 2. **Turbo is opt-in (tool call)**
    - The LLM can request Turbo, but you keep a policy gate:
@@ -26,11 +31,14 @@ Telegram Trigger → (voice?) Transcribe → AI Agent
 → Router:
 - if LLM can answer directly → reply
 - if tool needed → call tool (Gmail, Calendar, DB…)
-- if UI task needed → call **OpenClaw Turbo** (HTTP Request node)
+- if web task needed → call **OpenClaw** (browse, scrape, social media)
+- if project build → call **OpenClaw** (Spec Kit + GitHub)
+- if workflow needed → call **OpenClaw** (Workflow Builder)
 
 ### Strongly recommended: Action Draft + Approval Gate
 
-For anything that triggers OpenClaw (UI actions, browsing, scraping), avoid letting the LLM call the HTTP node directly.
+For anything that triggers OpenClaw (web browsing, scraping, social media,
+project builds, workflow creation), avoid letting the LLM call the HTTP node directly.
 
 Instead:
 1) LLM outputs `[ACTION_DRAFT]` + JSON payload

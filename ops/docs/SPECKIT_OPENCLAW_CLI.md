@@ -1,8 +1,9 @@
 # Spec Kit + OpenClaw + CLI Implementers — Autopilot Architecture
 
 This document defines the **end-to-end autonomous build flow** in janAGI:
-OpenClaw refines the intent with the user, bootstraps the repo with Spec Kit,
-and delegates all code/spec generation to CLI implementers.
+n8n (integrator) routes the request, OpenClaw (brain+hands) refines the intent
+with the user, bootstraps the repo with Spec Kit, and delegates all code/spec
+generation to CLI implementers (Gemini, Copilot).
 
 ## Guiding Principle
 
@@ -106,10 +107,11 @@ It does ALL operational/infrastructure work so the human only provides intent.
 CLI implements **everything else**: constitution, spec, plan, tasks, code, tests.
 They follow the Spec Kit sequence strictly and commit after each phase.
 
-### n8n — Visible Orchestrator + API Surface
+### n8n — Integrator / Curator
 
-n8n triggers OpenClaw via HTTP and saves logs. It does NOT run git/specify
-commands itself. The workflow is deliberately simple:
+n8n triggers OpenClaw via HTTP and manages state (DB logging, safety gates).
+It does NOT run git/specify commands itself. It does NOT make decisions.
+The workflow is deliberately simple:
 `Webhook → Run OpenClaw (HTTP) → Save logs → Respond`
 
 n8n also serves as OpenClaw's **API surface for workflow management**:

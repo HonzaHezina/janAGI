@@ -76,3 +76,28 @@ Aligned the SQL schema with the **live n8n workflows** (WF_40, WF_41):
 - `RAG.md` thinned to pointer → `DB_SCHEMA.md` + `MEMORY_ARCHITECTURE.md`
 - `WORKFLOWS.md` rewritten with legacy marks
 - Hostname references unified (`postgres` for compose, `janagi-db` for Coolify)
+
+---
+
+## Architecture Vision Alignment (2026-02-07, batch 2)
+
+Aligned all documentation to the correct system paradigm:
+
+### Core Paradigm
+- **n8n** = Integrator / Curator — routes workflows, manages state, enforces safety gates. Does NOT think or decide.
+- **OpenClaw / Jackie** = Brain + Hands + Eyes — LLM reasoning, web browsing/scraping/social media, Spec Kit project builds, n8n workflow creation.
+- **MindsDB** = Analytics Department — PRIMARY: external business intelligence (multi-source data aggregation, lead scoring, competitor analysis). SECONDARY: internal operational analytics.
+- **PostgreSQL** = Memory — all data in `rag.*`, analytics results in `analytics.*`.
+
+### Files Updated
+- `ARCHITECTURE.md` — Vision, components, data flow diagrams, agent architecture pattern all rewritten for integrator/brain paradigm
+- `README.md` — Opening tagline, "What It Does" section (added web intelligence + MindsDB external analytics), architecture mermaid diagram (added MindsDB + web flows), tech stack table, roadmap
+- `PERSONAL_ASSISTANT_TURBO.md` — Reframed from "Turbo" to "brain+hands+eyes"
+- `OPENCLAW_TURBO.md` — Opening section updated
+- `SPECKIT_OPENCLAW_CLI.md` — n8n role renamed from "Orchestrator" to "Integrator"
+- `N8N_WORKFLOW_BUILDER.md` — Architecture description updated
+- `N8N_UI_OPERATOR.md` — Opening section updated
+- `MINDSDB_ANALYTICS.md` — Added external BI as primary purpose, external data sources table, updated architecture diagram with OpenClaw data pipeline
+- `0001-hybrid-ops-analytics.md` (ADR) — Updated to reflect integrator paradigm + MindsDB external BI focus
+- `MEMORY_ARCHITECTURE.md` — Access patterns labeled with roles (Integrator/Brain)
+- `OPENCLAW_DISPATCHER_CONTRACT.md` — Fixed `rag.start_run()` → `rag.start_run_for_thread()`

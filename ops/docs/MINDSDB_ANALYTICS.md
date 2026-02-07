@@ -1,21 +1,47 @@
 # MindsDB Analytics Integration
 
-MindsDB provides **batch analytics** for janAGI — scoring, trend detection, and reporting.
-It does **not** interfere with live chat; it operates as a scheduled background processor.
+MindsDB is the **analytics department** of janAGI. It has two missions:
+
+1. **External Business Intelligence (primary)** — combine data from multiple sources
+   (web scraping, social media, purchases, CRM, browsing behavior) into actionable
+   insights, ML-scored leads, and automated reports.
+2. **Internal Operational Analytics** — conversation trend detection, usage patterns,
+   engagement metrics from janAGI’s own `rag.*` data.
+
+MindsDB does **not** interfere with live chat; it operates as a scheduled background processor.
+
+---
+
+## How It Fits Together
+
+The data pipeline works like this:
+1. **OpenClaw (eyes)** browses websites, scrapes social media, fetches competitor data
+2. **n8n workflows** store this raw data in `rag.events` / `rag.artifacts` (PostgreSQL)
+3. **MindsDB (batch jobs)** reads `rag.*`, combines it with other data sources,
+   runs ML models, and writes results to `analytics.*`
+4. **n8n workflows** read `analytics.*` and push reports/insights to Telegram
 
 ---
 
 ## What MindsDB Does
 
+### External Business Intelligence (Primary)
+
 | Capability | Description |
 |-----------|-------------|
-| **Lead Scoring** | ML model scores leads from `rag.events` / `rag.chunks`, writes to `analytics.lead_scores` |
-| **Trend Topics** | Daily aggregation of top topics & keywords from conversations, writes to `analytics.trends_daily` |
-| **Reporting** | n8n reads `analytics.*` tables and pushes summaries to Telegram / dashboard |
-| **Custom Models** | `CREATE MODEL ... PREDICT ...` over any Postgres data |
+| **Multi-Source Data Aggregation** | Combine scraped web data, social media signals, e-commerce data, CRM records into unified views |
+| **Lead Scoring** | ML model scores leads from combined data sources, writes to `analytics.lead_scores` |
+| **Competitor Monitoring** | Process scraped competitor data into trend reports |
+| **Customer Behavior Analysis** | Aggregate browsing, purchase, and interaction data across channels |
+| **Custom Models** | `CREATE MODEL ... PREDICT ...` over any Postgres data or external source |
 
-MindsDB connects to Postgres as a **read-only data source** for input,
-and writes results to the `analytics.*` schema.
+### Internal Analytics (Secondary)
+
+| Capability | Description |
+|-----------|-------------|
+| **Trend Topics** | Daily aggregation of top topics & keywords from conversations, writes to `analytics.trends_daily` |
+| **Usage Metrics** | Engagement patterns, active hours, popular commands |
+| **Reporting** | n8n reads `analytics.*` tables and pushes summaries to Telegram / dashboard |
 
 ---
 
@@ -23,24 +49,45 @@ and writes results to the `analytics.*` schema.
 
 ```mermaid
 flowchart LR
+  subgraph "OpenClaw (Eyes)"
+    OC[Web Browse / Scrape / Social Media]
+  end
+
+  subgraph "n8n (Integrator)"
+    WF_IN[Ingest Workflows]
+    WF_OUT[Report Workflows]
+  end
+
   subgraph Postgres
     RAG[(rag.* schema)]
     ANA[(analytics.* schema)]
   end
 
   subgraph MindsDB
-    ML[ML Models / Jobs]
+    ML[ML Models / Batch Jobs]
+    EXT[External Data Sources]
   end
 
-  subgraph n8n
-    WF[Workflows]
-  end
-
+  OC -->|raw data| WF_IN
+  WF_IN -->|store| RAG
   RAG -->|read-only| ML
-  ML -->|write scores, trends| ANA
-  ANA -->|read| WF
-  WF -->|Telegram / Dashboard| U[User]
+  EXT -->|external APIs| ML
+  ML -->|write scores, trends, insights| ANA
+  ANA -->|read| WF_OUT
+  WF_OUT -->|Telegram / Dashboard| U[User]
 ```
+
+### External Data Sources
+
+MindsDB can connect to external APIs and databases directly:
+
+| Source Type | Engine | Example Use |
+|-------------|--------|-------------|
+| PostgreSQL | `postgres` | janAGI’s own `rag.*` data |
+| MySQL | `mysql` | E-commerce databases |
+| HTTP API | `http` | REST APIs, social media APIs |
+| Google Sheets | `google_sheets` | Manual CRM/contact lists |
+| Custom ML | `lightwood` / `openai` | Predictions, classifications |
 
 ---
 

@@ -26,19 +26,28 @@ flowchart LR
     TG[Telegram]
   end
 
-  subgraph Orchestrator["n8n (Brain)"]
-    CHAT[Chat Flow]
+  subgraph Integrator["n8n (Integrator / Curator)"]
+    CHAT[Chat Flow - WF_40]
+    ACTION[Action Subflow - WF_41]
     SPEC[Spec-Kit Flow]
     MEM_API[Memory API]
+    BUILDER[Workflow Builder]
   end
 
   subgraph Data["PostgreSQL + pgvector"]
     RAG[(rag.* schema)]
+    ANA[(analytics.* schema)]
   end
 
-  subgraph Agent["OpenClaw (Jackie)"]
-    LLM[AI Reasoning]
-    TOOLS[Browser / CLI]
+  subgraph Agent["OpenClaw / Jackie
+  🧠 Brain + 👁️ Eyes + 🤲 Hands"]
+    LLM[🧠 AI Reasoning]
+    WEB[👁️ Web Browse / Scrape]
+    TOOLS[🤲 Spec Kit + GitHub + CLI]
+  end
+
+  subgraph Analytics["MindsDB (Analytics Dept.)"]
+    ML[ML Models / Batch Jobs]
   end
 
   TG -->|Message| CHAT
@@ -49,10 +58,20 @@ flowchart LR
   CHAT -->|Store| RAG
   CHAT -->|Reply| TG
 
-  TG -->|"Start project"| SPEC
-  SPEC -->|Refine| LLM
-  SPEC -->|Execute| TOOLS
+  CHAT -->|ACTION_DRAFT| ACTION
+  ACTION -->|Execute| WEB
+  ACTION -->|Execute| TOOLS
+  WEB -->|Data| RAG
+
+  TG -->|"Build project"| SPEC
+  SPEC -->|Refine + Execute| LLM
   SPEC -->|Log| RAG
+
+  BUILDER -->|Generate JSON| LLM
+
+  RAG -->|read-only| ML
+  ML -->|write| ANA
+  ANA -->|read reports| CHAT
 ```
 
 ---
@@ -61,11 +80,14 @@ flowchart LR
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Orchestrator | n8n (latest) | Workflow automation, webhook API |
-| Database | PostgreSQL 16 + pgvector 0.8.x | Vector store, audit log, knowledge base |
-| AI Agent | OpenClaw / Jackie | LLM reasoning, browser automation || Analytics | MindsDB | Batch lead scoring, trend detection, reporting || Chat Interface | Telegram Bot | User interaction |
+| Integrator | n8n (latest) | Workflow orchestration, routing, safety gates, webhook API |
+| Database | PostgreSQL 16 + pgvector 0.8.x | Vector store, audit log, knowledge base, memory |
+| AI Agent | OpenClaw / Jackie | 🧠 Reasoning, 👁️ web browsing/scraping, 🤲 project builds, workflow creation |
+| Analytics | MindsDB | External BI (multi-source data), internal trends, ML scoring |
+| Chat Interface | Telegram Bot | User interaction |
 | Hosting | Coolify on Hostinger VPS | Docker stack management |
 | Embeddings | OpenAI text-embedding-3-small (1536d) | Semantic search |
+| CLI Tools | Gemini CLI, Copilot CLI | Code implementation (delegated by OpenClaw via Spec Kit) |
 
 ---
 
@@ -189,12 +211,12 @@ janAGI/
 │   │       ├── 020_rag_schema.sql
 │   │       └── 030_analytics.sql
 │   ├── n8n/
-│   │   ├── main_chat_orchestrator.json
+│   │   ├── main_chat_orchestrator.json  # ⚠️ Legacy (superseded by WF_40)
 │   │   ├── memory_workflows.json
 │   │   ├── spec_kit_workflow.json
 │   │   ├── snippets/              # Reusable JS/SQL for n8n nodes
 │   │   ├── sql/                   # SQL templates for Postgres nodes
-│   │   └── workflows/             # Additional workflow templates
+│   │   └── workflows/             # WF_10–WF_41 templates
 │   ├── scripts/
 │   │   └── openclaw_spec_execute.sh
 │   └── services/
@@ -218,10 +240,14 @@ janAGI/
 
 - [x] Database schema with pgvector (rag.*)
 - [x] Memory API workflows (upsert/search)
-- [x] Main chat orchestrator (Telegram)
-- [x] Spec-Kit dispatcher contract
-- [ ] Live Telegram bot integration
+- [x] Main chat orchestrator (WF_40 Telegram)
+- [x] Action subflow with approval gate (WF_41)
+- [x] Spec-Kit dispatcher contract + CLI implementer contract
+- [x] n8n Workflow Builder (API-first)
+- [x] MindsDB integration (analytics schema + batch jobs)
+- [ ] Live Telegram bot deployment on Coolify
 - [ ] Document ingestion pipeline (URLs, PDFs)
-- [ ] Spec-Kit full autopilot (end-to-end)
-- [ ] Parallel implementer builds (Gemini vs Copilot)
+- [ ] Spec-Kit full autopilot (end-to-end parallel builds)
+- [ ] Web scraping data pipelines (social media, competitors)
+- [ ] MindsDB external analytics (multi-source BI dashboards)
 - [ ] Dashboard UI (bolt.diy or custom)

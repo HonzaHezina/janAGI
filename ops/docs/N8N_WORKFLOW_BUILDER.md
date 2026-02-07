@@ -13,7 +13,7 @@ n8n applies it through its REST API.
 
 ## Recommended architecture
 
-**n8n remains the orchestrator**, OpenClaw is the “Turbo”:
+**n8n is the integrator**, OpenClaw is the brain that generates the workflow:
 
 1) n8n receives a user request (Telegram/Webhook/UI)
 2) OpenClaw generates a **workflow spec** (n8n JSON: `name/nodes/connections/settings`)

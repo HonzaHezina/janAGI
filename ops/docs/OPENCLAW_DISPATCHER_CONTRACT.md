@@ -219,7 +219,7 @@ Before accepting a branch as "done", OpenClaw verifies:
 If the database is available, log to the `rag.*` schema:
 - `run_type = 'spec_build'`
 - Artifacts: `locked.json`, `result.json`, log file paths
-- Use `rag.start_run()`, `rag.log_event()`, `rag.finish_run()`
+- Use `rag.start_run_for_thread()`, `rag.log_event()`, `rag.finish_run()`
 
 ## 4. Capability: n8n Workflow Builder
 
