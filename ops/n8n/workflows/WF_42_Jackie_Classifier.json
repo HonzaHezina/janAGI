@@ -248,6 +248,28 @@
     },
     {
       "parameters": {
+        "chatId": "={{ $('Voice or Text').item.json.chat_id }}",
+        "text": "OK, pracuju na tom.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "c42-ack",
+      "name": "Telegram Ack",
+      "type": "n8n-nodes-base.telegram",
+      "position": [920, 140],
+      "webhookId": "wf42-ack",
+      "typeVersion": 1.1,
+      "credentials": {
+        "telegramApi": {
+          "id": "BsEzRf2V5iDa2CvB",
+          "name": "Telegram account PN"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": {
             "version": 2,
@@ -699,6 +721,13 @@
       ]
     },
     "Log User Msg": {
+      "main": [
+        [
+          { "node": "Telegram Ack", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Telegram Ack": {
       "main": [
         [
           { "node": "If category MEETING", "type": "main", "index": 0 }
