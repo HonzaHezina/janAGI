@@ -364,6 +364,66 @@
     },
     {
       "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value1": "UNKNOWN",
+              "operation": "equal",
+              "value2": "",
+              "output": 0
+            },
+            {
+              "value1": "MEETING",
+              "operation": "equal",
+              "value2": "",
+              "output": 1
+            },
+            {
+              "value1": "TASK",
+              "operation": "equal",
+              "value2": "",
+              "output": 2
+            },
+            {
+              "value1": "EMAIL",
+              "operation": "equal",
+              "value2": "",
+              "output": 3
+            },
+            {
+              "value1": "CHAT",
+              "operation": "equal",
+              "value2": "",
+              "output": 4
+            },
+            {
+              "value1": "WEB",
+              "operation": "equal",
+              "value2": "",
+              "output": 5
+            },
+            {
+              "value1": "DEV",
+              "operation": "equal",
+              "value2": "",
+              "output": 6
+            }
+          ],
+          "fallbackOutput": 0
+        },
+        "options": {}
+      },
+      "id": "switch-classifier-output",
+      "name": "Switch Classifier Output",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        740,
+        300
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"MEETING\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
@@ -1230,6 +1290,17 @@
       ]
     },
     "Classify Intent": {
+      "main": [
+        [
+          {
+            "node": "Switch Classifier Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Classifier Output": {
       "main": [
         [
           {
