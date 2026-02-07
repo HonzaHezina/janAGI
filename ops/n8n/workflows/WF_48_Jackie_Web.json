@@ -5,12 +5,12 @@
       "parameters": {
         "inputSource": "passthrough"
       },
-      "id": "caba1a4f-11ce-4b7e-8f20-527ab712c743",
+      "id": "3c684534-d0e7-4cb4-b05c-a788b9aaa32e",
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "position": [
-        -560,
-        -32
+        -1200,
+        -80
       ],
       "typeVersion": 1.1
     },
@@ -130,18 +130,7 @@
       ]
     }
   },
-  "pinData": {
-    "Execute Workflow Trigger": [
-      {
-        "json": {
-          "text": "Vyhledej mi aktuální kurz CZK vůči USD",
-          "chat_id": 12345,
-          "conversation_id": "manual-test",
-          "run_id": "manual-run"
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "settings": {
     "executionOrder": "v1"
   },
