@@ -453,6 +453,237 @@
       "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
     },
     {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-meeting",
+      "name": "Build Meeting Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        60
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-task",
+      "name": "Build Task Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        220
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-email",
+      "name": "Build Email Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        380
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-chat",
+      "name": "Build Chat Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        540
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-web",
+      "name": "Build Web Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        700
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-dev",
+      "name": "Build Dev Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        860
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            },
+            {
+              "name": "conversation_id",
+              "stringValue": "={{ $('Start Run').item.json.conversation_id }}"
+            },
+            {
+              "name": "run_id",
+              "stringValue": "={{ $('Start Run').item.json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-payload-unknown",
+      "name": "Build Unknown Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1030,
+        1020
+      ],
+      "typeVersion": 3.2
+    },
+    {
       "id": "c42-exec-meeting",
       "name": "Execute Meeting WF",
       "type": "n8n-nodes-base.executeWorkflow",
@@ -998,7 +1229,7 @@
       "main": [
         [
           {
-            "node": "Execute Meeting WF",
+            "node": "Build Meeting Input",
             "type": "main",
             "index": 0
           }
@@ -1009,7 +1240,7 @@
       "main": [
         [
           {
-            "node": "Execute Task WF",
+            "node": "Build Task Input",
             "type": "main",
             "index": 0
           }
@@ -1020,7 +1251,7 @@
       "main": [
         [
           {
-            "node": "Execute Email WF",
+            "node": "Build Email Input",
             "type": "main",
             "index": 0
           }
@@ -1031,7 +1262,7 @@
       "main": [
         [
           {
-            "node": "Execute Chat WF",
+            "node": "Build Chat Input",
             "type": "main",
             "index": 0
           }
@@ -1042,7 +1273,7 @@
       "main": [
         [
           {
-            "node": "Execute Web WF",
+            "node": "Build Web Input",
             "type": "main",
             "index": 0
           }
@@ -1053,7 +1284,7 @@
       "main": [
         [
           {
-            "node": "Execute SpecKit WF",
+            "node": "Build Dev Input",
             "type": "main",
             "index": 0
           }
@@ -1061,6 +1292,83 @@
       ]
     },
     "Log Category Unknown": {
+      "main": [
+        [
+          {
+            "node": "Build Unknown Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Meeting Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Meeting WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Task WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Email WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Chat Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Chat WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Web Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Web WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dev Input": {
+      "main": [
+        [
+          {
+            "node": "Execute SpecKit WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Unknown Input": {
       "main": [
         [
           {
