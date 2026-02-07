@@ -261,65 +261,6 @@
       },
       "onError": "continueRegularOutput"
     },
-      {
-        "parameters": {
-          "rules": [
-            {
-              "value": "UNKNOWN",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            },
-            {
-              "value": "MEETING",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            },
-            {
-              "value": "TASK",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            },
-            {
-              "value": "EMAIL",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            },
-            {
-              "value": "CHAT",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            },
-            {
-              "value": "WEB",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            },
-            {
-              "value": "DEV",
-              "operation": "equal",
-              "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-              "type": "string"
-            }
-          ],
-          "options": {
-            "fallbackOutput": 0
-          }
-        },
-        "id": "switch-classifier-output",
-        "name": "Switch Classifier Output",
-        "type": "n8n-nodes-base.switch",
-        "position": [
-          740,
-          300
-        ],
-        "typeVersion": 1
-      },
     {
       "parameters": {
         "fields": {
@@ -1292,24 +1233,6 @@
       "main": [
         [
           {
-            "node": "Switch Classifier Output",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Switch Classifier Output": {
-      "main": [
-        [
-          {
-            "node": "Log Category Unknown",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Log Category Meeting",
             "type": "main",
             "index": 0
@@ -1349,9 +1272,17 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Log Category Unknown",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
+    
     "Log Category Meeting": {
       "main": [
         [
