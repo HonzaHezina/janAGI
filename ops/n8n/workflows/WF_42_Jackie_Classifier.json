@@ -449,27 +449,13 @@
       "typeVersion": 2.2
     },
     {
-      "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
-        "fields": {
-          "values": [
-            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
-            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
-            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
-            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
-          ]
-        },
-        "options": { "waitForSubWorkflow": true }
-      },
       "id": "c42-exec-meeting",
       "name": "Execute Meeting WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 60],
-      "typeVersion": 1.2
-    },
-    {
+      "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_43 Jackie Meeting" },
         "fields": {
           "values": [
             { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
@@ -479,16 +465,16 @@
           ]
         },
         "options": { "waitForSubWorkflow": true }
-      },
+      }
+    },
+    {
       "id": "c42-exec-task",
       "name": "Execute Task WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 220],
-      "typeVersion": 1.2
-    },
-    {
+      "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_44 Jackie Task" },
         "fields": {
           "values": [
             { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
@@ -498,16 +484,16 @@
           ]
         },
         "options": { "waitForSubWorkflow": true }
-      },
+      }
+    },
+    {
       "id": "c42-exec-email",
       "name": "Execute Email WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 380],
-      "typeVersion": 1.2
-    },
-    {
+      "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_45 Jackie Email" },
         "fields": {
           "values": [
             { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
@@ -517,16 +503,16 @@
           ]
         },
         "options": { "waitForSubWorkflow": true }
-      },
+      }
+    },
+    {
       "id": "c42-exec-chat",
       "name": "Execute Chat WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 540],
-      "typeVersion": 1.2
-    },
-    {
+      "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_46 Jackie Chat" },
         "fields": {
           "values": [
             { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
@@ -536,16 +522,16 @@
           ]
         },
         "options": { "waitForSubWorkflow": true }
-      },
+      }
+    },
+    {
       "id": "c42-exec-web",
       "name": "Execute Web WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 700],
-      "typeVersion": 1.2
-    },
-    {
+      "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_48 Jackie Web" },
         "fields": {
           "values": [
             { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
@@ -555,16 +541,16 @@
           ]
         },
         "options": { "waitForSubWorkflow": true }
-      },
+      }
+    },
+    {
       "id": "c42-exec-spec",
       "name": "Execute SpecKit WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 860],
-      "typeVersion": 1.2
-    },
-    {
+      "typeVersion": 1.2,
       "parameters": {
-        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_49 Jackie SpecKit" },
         "fields": {
           "values": [
             { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
@@ -574,12 +560,26 @@
           ]
         },
         "options": { "waitForSubWorkflow": true }
-      },
+      }
+    },
+    {
       "id": "c42-exec-unknown",
       "name": "Execute Clarify WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [1320, 1020],
-      "typeVersion": 1.2
+      "typeVersion": 1.2,
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "WF_47 Jackie Clarify" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      }
     },
     {
       "parameters": {
