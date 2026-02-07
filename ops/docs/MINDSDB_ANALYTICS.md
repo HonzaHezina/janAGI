@@ -85,11 +85,11 @@ Run this in the MindsDB SQL editor (UI on port 47334 or via MySQL client on 4733
 CREATE DATABASE janagi_pg
 WITH ENGINE = 'postgres',
 PARAMETERS = {
-  "host": "postgres",
+  "host": "postgres",                -- docker-compose; Coolify: use "janagi-db"
   "port": "5432",
   "user": "mindsdb_ro",
   "password": "${MINDSDB_PG_PASSWORD}",
-  "database": "${POSTGRES_DB}",
+  "database": "janagi",
   "schema": "rag"
 };
 ```

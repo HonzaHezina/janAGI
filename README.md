@@ -71,20 +71,21 @@ flowchart LR
 
 ## Database Schema (`rag.*`)
 
-All data lives in a single Postgres database with the `rag` schema:
+All business data lives in the `janagi` Postgres database with the `rag` schema:
 
 - **`rag.clients`** / **`rag.projects`** — Multi-tenant scope
 - **`rag.conversations`** — Chat threads (Telegram, CLI, etc.)
-- **`rag.runs`** — Agent execution sessions
-- **`rag.events`** — Append-only audit log (messages, tool calls, errors)
-- **`rag.artifacts`** — Generated files, specs, diffs
+- **`rag.runs`** — Agent execution sessions (with `summary` + `metadata`)
+- **`rag.events`** — Append-only audit log (`actor_type`, `actor_name`, `event_type`, `name`, `payload` jsonb, `ts`)
+- **`rag.artifacts`** — Generated outputs (`kind`, `title`, `content_text`, `metadata`)
 - **`rag.sources`** → **`rag.documents`** → **`rag.chunks`** — RAG pipeline (source → document → embedded chunks)
 - **`analytics.trends_daily`** — Daily topic/keyword aggregation (MindsDB)
 - **`analytics.lead_scores`** — ML-scored leads (MindsDB)
 
-Helper functions: `rag.start_run()`, `rag.log_event()`, `rag.finish_run()`, `rag.search_chunks()`.
+Helper functions: `rag.start_run_for_thread()`, `rag.log_event()` (9-arg), `rag.finish_run()`, `rag.search_chunks()`.
 
-Full SQL: [`ops/infra/postgres/init/020_rag_schema.sql`](ops/infra/postgres/init/020_rag_schema.sql)
+Full SQL: [`ops/infra/postgres/init/020_rag_schema.sql`](ops/infra/postgres/init/020_rag_schema.sql) |
+Full docs: [`ops/docs/DB_SCHEMA.md`](ops/docs/DB_SCHEMA.md)
 
 ---
 
@@ -93,21 +94,17 @@ Full SQL: [`ops/infra/postgres/init/020_rag_schema.sql`](ops/infra/postgres/init
 ### Core Workflows
 | File | Purpose |
 |------|---------|
-| `main_chat_orchestrator.json` | Telegram → Log → RAG Search → AI Agent → Parse Actions → Reply |
+| `WF_40_Jackie_Telegram_Assistant.json` | **LIVE** — Jackie AI: Telegram → voice/text → history → AI agent → reply or ACTION_DRAFT |
+| `WF_41_Jackie_Action_Subflow.json` | **LIVE** — Approved action executor via OpenClaw |
 | `memory_workflows.json` | Webhook API: `/memory-upsert` and `/memory-search` |
 | `spec_kit_workflow.json` | Spec-Kit: Refine requirements → Lock spec → Execute build |
 
 ### Supporting Templates
 | File | Purpose |
 |------|---------|
-| `WF_01_Ingest_Message.json` | Ingest & embed a message into RAG |
-| `WF_02_Hunter_Run.json` | Scheduled data collection |
-| `WF_03_Analyst_Draft_and_Telegram_Approval.json` | Draft + Telegram approval gate |
 | `WF_10_Turbo_OpenClaw_Run.json` | Direct OpenClaw API call |
 | `WF_20_Builder_Create_Workflow_via_API.json` | Auto-create n8n workflows via API |
 | `WF_30_SpecKit_Full_Build_Parallel.json` | Full parallel build: Gemini + Copilot → winner → PR |
-| `WF_40_Jackie_Telegram_Assistant.json` | Main Jackie AI assistant (Telegram chat + voice) |
-| `WF_41_Jackie_Action_Subflow.json` | Approved action executor via OpenClaw |
 
 Import instructions: [`ops/docs/WORKFLOWS.md`](ops/docs/WORKFLOWS.md)
 
@@ -123,6 +120,7 @@ Based on `ops/infra/.env.example`:
 - `POSTGRES_PASSWORD` — Database password
 - `N8N_ENCRYPTION_KEY` — At least 32 characters
 - `OPENAI_API_KEY` — For embeddings
+- `MISTRAL_API_KEY` — For LLM (WF_40 uses Mistral)
 - Telegram Bot Token — Configure in n8n credentials
 
 ### 3. Deploy
@@ -140,17 +138,17 @@ Rename Coolify resources to short names for predictable DNS.
 
 | Service | Hostname | Port | Exposed? |
 |---------|----------|------|----------|
-| PostgreSQL | `janagi-db` | 5432 | ❌ No |
+| PostgreSQL | `postgres` (compose) / `janagi-db` (Coolify) | 5432 | ❌ No |
 | n8n | `n8n` | 5678 | ✅ Webhooks (HTTPS) |
 | OpenClaw | `openclaw` | 18789 | ❌ No (internal-only) |
 | MindsDB | `mindsdb` | 47335 | ❌ No |
 
 Internal routes:
-- n8n → janagi DB: `janagi-db:5432`
+- n8n → Postgres: `postgres:5432` (compose) / `janagi-db:5432` (Coolify)
 - n8n → OpenClaw: `http://openclaw:18789`
 - n8n → MindsDB: `mindsdb:47335` (MySQL API)
 - OpenClaw → n8n: `http://n8n:5678`
-- MindsDB → janagi DB: `janagi-db:5432` (read-only)
+- MindsDB → Postgres: `postgres:5432` / `janagi-db:5432` (read-only)
 
 **Never use `localhost` or `127.0.0.1`** between containers.
 

@@ -1,17 +1,15 @@
 # RAG (Retrieval-Augmented Generation)
 
-Canonical DB implementation: `rag.*` schema (see [`020_rag_schema.sql`](../infra/postgres/init/020_rag_schema.sql)).
+> This is a brief overview. Full details:
+> - **DB tables & functions**: [DB_SCHEMA.md](DB_SCHEMA.md)
+> - **Memory architecture**: [MEMORY_ARCHITECTURE.md](MEMORY_ARCHITECTURE.md)
+> - **SQL templates**: [`ops/n8n/sql/RAG_POSTGRES_NODES.sql`](../n8n/sql/RAG_POSTGRES_NODES.sql)
 
 ## Memory Types
 
 1. **Short-term** (`rag.events`): Every message in every conversation — append-only log.
 2. **Long-term** (`rag.chunks`): Curated facts, extracted knowledge, ingested documents — vector-indexed.
-3. **Artifacts** (`rag.artifacts`): Generated outputs (specs, code diffs, locked.json files).
-
-## Why Store Every Message
-- Continuity: AI can reference earlier parts of the conversation
-- Personalization: learns user preferences over time
-- Audit trail: full traceability of what was said and done
+3. **Artifacts** (`rag.artifacts`): Generated outputs (OpenClaw results, specs, code).
 
 ## RAG Pipeline
 ```

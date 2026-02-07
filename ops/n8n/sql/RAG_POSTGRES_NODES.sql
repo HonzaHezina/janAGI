@@ -1,123 +1,271 @@
 -- n8n Postgres node SQL templates (rag.*)
 --
--- These snippets match the stored functions in 020_rag_schema.sql.
--- Use positional parameters ($1..$n) in n8n's "Query Parameters" field.
+-- Matches the LIVE function signatures in 020_rag_schema.sql.
+-- Copy-paste into n8n Postgres nodes and map parameters.
 --
--- Functions available:
---   rag.start_run(client_key, project_key, conversation_key, run_type, metadata) → uuid
---   rag.log_event(run_id, event_type, actor_role, content, payload) → uuid
---   rag.finish_run(run_id, status) → void
---   rag.search_chunks(project_key, embedding, threshold, count) → table
+-- Functions:
+--   rag.start_run_for_thread(client_id, project_id, channel, thread_key, kind, title, run_meta, conv_meta) → (conversation_id, run_id, is_new_conversation)
+--   rag.log_event(client_id, project_id, conversation_id, run_id, actor_type, actor_name, event_type, name, payload) → event_id
+--   rag.finish_run(run_id, status, summary, metadata) → void
+--   rag.search_chunks(project_key, embedding, threshold, count) → (id, content, similarity, metadata)
 --
 
 -- =============================
--- 1) Start a new run
+-- 1) Start a run (with thread resolution)
 -- =============================
--- PARAMS:
---   $1 = client_key (text)       e.g. 'janagi'
---   $2 = project_key (text)      e.g. 'janagi'
---   $3 = conversation_key (text) e.g. Telegram chat_id as text
---   $4 = run_type (text)         e.g. 'chat', 'tool', 'spec_audit'
-SELECT rag.start_run($1, $2, $3, $4) AS run_id;
+-- PARAMS (n8n expressions):
+--   client_id  (uuid)   — e.g. '781594f6-...'
+--   project_id (uuid)   — e.g. '56c83308-...'
+--   channel    (text)   — 'telegram'
+--   thread_key (text)   — chat_id from Telegram
+--   kind       (text)   — 'chat', 'web_fetch', 'spec_build'
+--   title      (text)   — e.g. 'Telegram chat 717801484'
+SELECT * FROM rag.start_run_for_thread(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  'telegram',
+  '{{ $json.message.chat.id }}'::text,
+  'chat',
+  ('Telegram chat ' || '{{ $json.message.chat.id }}')::text,
+  '{}'::jsonb,
+  '{}'::jsonb
+);
 
 
 -- =============================
 -- 2) Log user message
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)     from start_run result
---   $2 = content (text)    the user's message text
---   $3 = payload (jsonb)   optional: raw Telegram message JSON
-SELECT rag.log_event($1, 'message', 'user', $2, COALESCE($3::jsonb, '{}'::jsonb)) AS event_id;
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  'user',
+  '{{ $json.message.from.id }}'::text,
+  'message',
+  NULL,
+  jsonb_build_object(
+    'role', 'user',
+    'text', to_jsonb('{{ $json.message.text }}'::text),
+    'channel', 'telegram',
+    'chat_id', to_jsonb('{{ $json.message.chat.id }}'::text)
+  )
+) AS event_id;
 
 
 -- =============================
 -- 3) Log assistant response
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)
---   $2 = content (text)    the assistant's response text
---   $3 = payload (jsonb)   optional: model metadata, tokens used, etc.
-SELECT rag.log_event($1, 'message', 'assistant', $2, COALESCE($3::jsonb, '{}'::jsonb)) AS event_id;
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  'n8n',
+  'ai_jackie',
+  'message',
+  NULL,
+  jsonb_build_object(
+    'role', 'assistant',
+    'text', to_jsonb('{{ $json.response_text }}'::text),
+    'channel', 'telegram'
+  )
+) AS event_id;
 
 
 -- =============================
--- 4) Log action draft (approval pending)
+-- 4) Log action draft
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)
---   $2 = draft_json (jsonb)  the ACTION_DRAFT payload
-SELECT rag.log_event($1, 'action_draft', 'assistant', NULL, $2::jsonb) AS event_id;
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  'n8n',
+  'ai_jackie',
+  'tool_call',
+  'action_draft',
+  jsonb_build_object(
+    'type', 'action_draft',
+    'raw', to_jsonb('{{ $json.draft_text }}'::text)
+  )
+) AS event_id;
 
 
 -- =============================
--- 5) Log approval callback
+-- 5) Log action draft sent (Telegram message ID for callback matching)
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)
---   $2 = approval_payload (jsonb)  e.g. {"decision": "approved", "callback_data": "..."}
-SELECT rag.log_event($1, 'approval', 'user', NULL, $2::jsonb) AS event_id;
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  'n8n',
+  'telegram',
+  'tool_result',
+  'action_draft_sent',
+  jsonb_build_object(
+    'status', 'sent',
+    'telegram_message_id', '{{ $json.telegram_message_id }}'::text,
+    'channel', 'telegram'
+  )
+) AS event_id;
 
 
 -- =============================
--- 6) Log tool call
+-- 6) Log approval callback
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)
---   $2 = content (text)    tool name or description
---   $3 = payload (jsonb)   tool input/output
-SELECT rag.log_event($1, 'tool_call', 'system', $2, $3::jsonb) AS event_id;
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  NULL,
+  'user',
+  '{{ $json.telegram_user_id }}'::text,
+  'message',
+  'approval',
+  jsonb_build_object(
+    'role', 'user',
+    'text', CASE WHEN '{{ $json.decision }}' = 'approved' THEN '[APPROVED]' ELSE '[REJECTED]' END,
+    'decision', '{{ $json.decision }}',
+    'channel', 'telegram'
+  )
+) AS event_id;
 
 
 -- =============================
--- 7) Load recent conversation history
+-- 7) Log tool call (e.g. OpenClaw web action)
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)   — we look up conversation_id from the run
---   $2 = limit (int)     — number of recent events to load
-SELECT e.event_type, e.actor_role, e.content, e.payload, e.created_at
-FROM rag.events e
-JOIN rag.runs r ON r.id = $1::uuid
-WHERE e.run_id IN (
-  SELECT id FROM rag.runs WHERE conversation_id = r.conversation_id
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  'n8n',
+  'subwf:web',
+  'tool_call',
+  'openclaw',
+  jsonb_build_object(
+    'type', 'web',
+    'target', 'openclaw',
+    'mode', '{{ $json.mode }}',
+    'model', '{{ $json.model }}',
+    'input', '{{ $json.input }}'
+  )
+) AS event_id;
+
+
+-- =============================
+-- 8) Log tool result
+-- =============================
+SELECT rag.log_event(
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  'openclaw',
+  '{{ $json.model }}'::text,
+  'tool_result',
+  'openclaw',
+  jsonb_build_object(
+    'status', 'success',
+    'mode', '{{ $json.mode }}',
+    'artifact_id', '{{ $json.artifact_id }}'::text
+  )
+) AS event_id;
+
+
+-- =============================
+-- 9) Load conversation history
+-- =============================
+-- Used by WF_40 "Load history" node.
+-- Returns last N messages (user + assistant) for AI context injection.
+SELECT role, content, ts
+FROM (
+  SELECT
+    COALESCE(payload->>'role', actor_type) AS role,
+    COALESCE(
+      payload->>'text',
+      payload->>'content',
+      payload->>'message',
+      payload->>'raw'
+    ) AS content,
+    ts
+  FROM rag.events
+  WHERE conversation_id = '{{ $json.conversation_id }}'::uuid
+    AND event_type = 'message'
+    AND COALESCE(payload->>'role', actor_type) IN ('user', 'assistant')
+    AND COALESCE(payload->>'text', payload->>'content', payload->>'message', payload->>'raw') IS NOT NULL
+  ORDER BY ts DESC
+  LIMIT 20
+) t
+ORDER BY ts ASC;
+
+
+-- =============================
+-- 10) Insert artifact
+-- =============================
+-- Used by WF_41 "Insert Artifact" node.
+INSERT INTO rag.artifacts (
+  client_id, project_id, conversation_id, run_id,
+  kind, title, content_text, metadata
 )
-AND e.event_type = 'message'
-AND e.actor_role IN ('user', 'assistant')
-ORDER BY e.created_at DESC
-LIMIT $2::int;
-
-
--- =============================
--- 8) Semantic search (RAG retrieval)
--- =============================
--- PARAMS:
---   $1 = project_key (text)     e.g. 'janagi'
---   $2 = embedding (vector)     the query embedding as string
---   $3 = threshold (float)      e.g. 0.5
---   $4 = match_count (int)      e.g. 5
-SELECT * FROM rag.search_chunks($1, $2::vector, $3::float, $4::int);
-
-
--- =============================
--- 9) Save an artifact
--- =============================
--- PARAMS:
---   $1 = run_id (uuid)
---   $2 = project_id (uuid)     from run context
---   $3 = key (text)            e.g. 'locked.json', 'spec.md'
---   $4 = type (text)           e.g. 'json', 'file', 'text'
---   $5 = content (text)        text content
---   $6 = data (jsonb)          structured data (nullable)
-INSERT INTO rag.artifacts (run_id, project_id, key, type, content, data)
-VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::jsonb)
-ON CONFLICT (run_id, key) DO UPDATE SET content = EXCLUDED.content, data = EXCLUDED.data
+VALUES (
+  '{{ $json.client_id }}'::uuid,
+  '{{ $json.project_id }}'::uuid,
+  '{{ $json.conversation_id }}'::uuid,
+  '{{ $json.run_id }}'::uuid,
+  '{{ $json.kind }}',
+  '{{ $json.title }}'::text,
+  '{{ $json.content_text }}'::text,
+  '{{ $json.metadata }}'::jsonb
+)
 RETURNING id AS artifact_id;
 
 
 -- =============================
--- 10) Finish run
+-- 11) Semantic search (RAG retrieval)
 -- =============================
--- PARAMS:
---   $1 = run_id (uuid)
---   $2 = status (text)   'completed' or 'failed'
-SELECT rag.finish_run($1, COALESCE(NULLIF($2, ''), 'completed'));
+-- Used by memory_workflows.json "Postgres Search" node.
+SELECT * FROM rag.search_chunks(
+  '{{ $json.namespace || "janagi" }}',
+  '{{ $json.embedding_vec }}'::vector,
+  0.5,
+  {{ $json.top_k || 5 }}
+);
+
+
+-- =============================
+-- 12) Memory upsert (direct chunk insert)
+-- =============================
+-- Used by memory_workflows.json "Postgres Insert" node.
+INSERT INTO rag.chunks (project_id, content, embedding, metadata)
+SELECT p.id, '{{ $json.content }}', '{{ $json.embedding_vec }}'::vector, '{{ $json.metadata }}'::jsonb
+FROM rag.projects p
+WHERE p.project_key = '{{ $json.namespace || "janagi" }}'
+RETURNING id;
+
+
+-- =============================
+-- 13) Finish run
+-- =============================
+-- Used by WF_41 "Finish run" node.
+SELECT rag.finish_run(
+  '{{ $json.run_id }}'::uuid,
+  '{{ $json.status || "success" }}',
+  '{{ $json.summary || "" }}',
+  '{{ $json.metadata || "{}" }}'::jsonb
+);
+
+
+-- =============================
+-- 14) Find conversation by action draft telegram_message_id
+-- =============================
+-- Used by WF_41 "Start SubRun" to link a callback to its original conversation.
+SELECT e.conversation_id
+FROM rag.events e
+WHERE e.event_type = 'tool_result'
+  AND e.name = 'action_draft_sent'
+  AND e.payload->>'telegram_message_id' = '{{ $json.telegram_message_id }}'
+ORDER BY e.ts DESC
+LIMIT 1;

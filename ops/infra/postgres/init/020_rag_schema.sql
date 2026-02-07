@@ -1,6 +1,10 @@
--- janAGI Schema Definition (Advanced RAG + Agent)
--- Reconstructs the full RAG/Agent schema compatible with n8n workflows shown in screenshots.
--- Includes: Clients, Projects, Runs, Events, Artifacts, Sources, Documents, Chunks, and Helper Functions.
+-- janAGI RAG + Agent Schema
+-- Source of truth for the janagi business database.
+-- Matches the LIVE n8n workflows (WF_40, WF_41, memory_workflows).
+--
+-- Tables:  rag.clients, projects, conversations, runs, events, artifacts,
+--          sources, documents, chunks
+-- Functions: start_run_for_thread, log_event, finish_run, search_chunks
 
 CREATE SCHEMA IF NOT EXISTS rag;
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -11,76 +15,82 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Clients (Tenants)
 CREATE TABLE IF NOT EXISTS rag.clients (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_key text NOT NULL,
-  name text,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_key text        NOT NULL,
+  name       text,
+  metadata   jsonb       NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (client_key)
 );
 
 -- Projects (Workspaces)
 CREATE TABLE IF NOT EXISTS rag.projects (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid NOT NULL REFERENCES rag.clients(id) ON DELETE CASCADE,
-  project_key text NOT NULL,
-  name text,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id   uuid        NOT NULL REFERENCES rag.clients(id) ON DELETE CASCADE,
+  project_key text        NOT NULL,
+  name        text,
+  metadata    jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now(),
   UNIQUE (client_id, project_key)
 );
 
 -- Conversations (Threads)
 CREATE TABLE IF NOT EXISTS rag.conversations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid NOT NULL REFERENCES rag.clients(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES rag.projects(id) ON DELETE CASCADE,
-  channel text NOT NULL DEFAULT 'telegram',
-  thread_key text NOT NULL,
-  title text,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id     uuid        NOT NULL REFERENCES rag.clients(id) ON DELETE CASCADE,
+  project_id    uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
+  channel       text        NOT NULL DEFAULT 'telegram',
+  thread_key    text        NOT NULL,
+  title         text,
+  metadata      jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now(),
   last_event_at timestamptz,
   UNIQUE (client_id, project_id, channel, thread_key)
 );
 
--- Runs (Executions)
+-- Runs (Execution sessions)
 CREATE TABLE IF NOT EXISTS rag.runs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid REFERENCES rag.clients(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES rag.projects(id) ON DELETE CASCADE,
-  conversation_id uuid REFERENCES rag.conversations(id) ON DELETE SET NULL,
-  run_type text NOT NULL, -- 'chat', 'tool', 'spec_audit'
-  status text NOT NULL DEFAULT 'running', -- 'running', 'completed', 'failed'
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  started_at timestamptz NOT NULL DEFAULT now(),
-  finished_at timestamptz
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id       uuid        REFERENCES rag.clients(id) ON DELETE CASCADE,
+  project_id      uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
+  conversation_id uuid        REFERENCES rag.conversations(id) ON DELETE SET NULL,
+  run_type        text        NOT NULL,           -- 'chat', 'web_fetch', 'web_search', 'spec_build'
+  status          text        NOT NULL DEFAULT 'running', -- 'running', 'success', 'failed'
+  summary         text,                            -- outcome description (set by finish_run)
+  metadata        jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  started_at      timestamptz NOT NULL DEFAULT now(),
+  finished_at     timestamptz
 );
 
--- Events (Logs)
+-- Events (Append-only audit log)
+-- Column names match WF_40/WF_41 live queries exactly.
 CREATE TABLE IF NOT EXISTS rag.events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id uuid REFERENCES rag.runs(id) ON DELETE CASCADE,
-  client_id uuid REFERENCES rag.clients(id),
-  project_id uuid REFERENCES rag.projects(id),
-  event_type text NOT NULL, -- 'message', 'tool_call', 'tool_result', 'error'
-  actor_role text NOT NULL, -- 'user', 'assistant', 'system'
-  content text,
-  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  run_id          uuid        REFERENCES rag.runs(id) ON DELETE CASCADE,
+  client_id       uuid        REFERENCES rag.clients(id),
+  project_id      uuid        REFERENCES rag.projects(id),
+  conversation_id uuid        REFERENCES rag.conversations(id),
+  actor_type      text        NOT NULL,            -- 'user', 'n8n', 'openclaw', 'system'
+  actor_name      text,                             -- 'ai_jackie', 'telegram', 'subwf:web'
+  event_type      text        NOT NULL,            -- 'message', 'tool_call', 'tool_result', 'error'
+  name            text,                             -- sub-type: 'approval', 'action_draft', 'openclaw', 'action_draft_sent'
+  payload         jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  ts              timestamptz NOT NULL DEFAULT now()
 );
 
--- Artifacts (Files/Outputs generated by Agent)
+-- Artifacts (Generated outputs)
+-- Column names match WF_41 INSERT INTO rag.artifacts exactly.
 CREATE TABLE IF NOT EXISTS rag.artifacts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id uuid REFERENCES rag.runs(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES rag.projects(id),
-  key text NOT NULL, -- e.g., 'spec.md', 'code_diff.patch', 'locked.json'
-  type text NOT NULL, -- 'file', 'link', 'text', 'json'
-  content text,
-  data jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (run_id, key)
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id       uuid        REFERENCES rag.clients(id),
+  project_id      uuid        REFERENCES rag.projects(id),
+  conversation_id uuid        REFERENCES rag.conversations(id),
+  run_id          uuid        REFERENCES rag.runs(id) ON DELETE CASCADE,
+  kind            text        NOT NULL,            -- 'openclaw_web_result', 'locked.json', 'spec.md'
+  title           text,
+  content_text    text,                             -- text content
+  metadata        jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now()
 );
 
 -- ==========================================
@@ -89,149 +99,197 @@ CREATE TABLE IF NOT EXISTS rag.artifacts (
 
 -- Sources (Where data comes from)
 CREATE TABLE IF NOT EXISTS rag.sources (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id uuid REFERENCES rag.projects(id) ON DELETE CASCADE,
-  type text NOT NULL, -- 'url', 'file', 'telegram'
-  uri text NOT NULL,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
+  type       text        NOT NULL,                -- 'url', 'file', 'telegram'
+  uri        text        NOT NULL,
+  metadata   jsonb       NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- Documents (Parent content units)
 CREATE TABLE IF NOT EXISTS rag.documents (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  source_id uuid REFERENCES rag.sources(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES rag.projects(id) ON DELETE CASCADE,
-  hash text, 
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id  uuid        REFERENCES rag.sources(id) ON DELETE CASCADE,
+  project_id uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
+  hash       text,
+  metadata   jsonb       NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Chunks (Vector Store)
--- This replaces 'janagi_documents' to match user screenshot structure
+-- Chunks (Vector store — RAG retrieval target)
 CREATE TABLE IF NOT EXISTS rag.chunks (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  document_id uuid REFERENCES rag.documents(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES rag.projects(id) ON DELETE CASCADE,
-  
-  content text NOT NULL,
-  embedding vector(1536), -- OpenAI Small standard
-  
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id uuid        REFERENCES rag.documents(id) ON DELETE CASCADE,
+  project_id  uuid        REFERENCES rag.projects(id) ON DELETE CASCADE,
+  content     text        NOT NULL,
+  embedding   vector(1536),                        -- OpenAI text-embedding-3-small
   chunk_index int,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+  metadata    jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw ON rag.chunks USING hnsw (embedding vector_cosine_ops);
-
 -- ==========================================
--- 3. FUNCTIONS (Required by n8n)
+-- 3. INDEXES
 -- ==========================================
 
--- FUNCTION: start_run
--- Used by "Start run" node in n8n
-CREATE OR REPLACE FUNCTION rag.start_run(
-  p_client_key text,
-  p_project_key text,
-  p_conversation_key text,
-  p_run_type text,
-  p_metadata jsonb DEFAULT '{}'::jsonb
-) RETURNS uuid
+-- Vector search (HNSW for fast approximate nearest neighbor)
+CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw
+  ON rag.chunks USING hnsw (embedding vector_cosine_ops);
+
+-- Events: history loading (WF_40 "Load history" node)
+-- WHERE conversation_id = ... AND event_type = 'message' ORDER BY ts DESC
+CREATE INDEX IF NOT EXISTS idx_events_conv_type_ts
+  ON rag.events (conversation_id, event_type, ts DESC);
+
+-- Events: action draft lookup (WF_41 "Start SubRun" node)
+-- WHERE event_type = 'tool_result' AND name = 'action_draft_sent'
+CREATE INDEX IF NOT EXISTS idx_events_type_name
+  ON rag.events (event_type, name);
+
+-- Events: run timeline
+CREATE INDEX IF NOT EXISTS idx_events_run_id
+  ON rag.events (run_id, ts);
+
+-- Runs: conversation lookup
+CREATE INDEX IF NOT EXISTS idx_runs_conversation
+  ON rag.runs (conversation_id, started_at DESC);
+
+-- Artifacts: per-run listing
+CREATE INDEX IF NOT EXISTS idx_artifacts_run
+  ON rag.artifacts (run_id, created_at);
+
+-- ==========================================
+-- 4. FUNCTIONS
+-- ==========================================
+
+-- FUNCTION: start_run_for_thread
+-- Used by WF_40 "Start run" and WF_41 "Start SubRun".
+-- Resolves or creates a conversation, then creates a new run.
+-- Returns: conversation_id, run_id, is_new_conversation
+CREATE OR REPLACE FUNCTION rag.start_run_for_thread(
+  p_client_id  uuid,
+  p_project_id uuid,
+  p_channel    text,
+  p_thread_key text,
+  p_kind       text,
+  p_title      text,
+  p_run_meta   jsonb DEFAULT '{}'::jsonb,
+  p_conv_meta  jsonb DEFAULT '{}'::jsonb
+)
+RETURNS TABLE (conversation_id uuid, run_id uuid, is_new_conversation boolean)
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_client_id uuid;
-  v_project_id uuid;
   v_conv_id uuid;
-  v_run_id uuid;
+  v_run_id  uuid;
+  v_is_new  boolean := false;
 BEGIN
-  -- 1. Resolve Client
-  SELECT id INTO v_client_id FROM rag.clients WHERE client_key = p_client_key;
-  IF v_client_id IS NULL THEN
-    INSERT INTO rag.clients (client_key, name) VALUES (p_client_key, p_client_key) RETURNING id INTO v_client_id;
-  END IF;
+  -- 1. Resolve or create conversation
+  SELECT c.id INTO v_conv_id
+  FROM rag.conversations c
+  WHERE c.client_id  = p_client_id
+    AND c.project_id = p_project_id
+    AND c.channel    = p_channel
+    AND c.thread_key = p_thread_key;
 
-  -- 2. Resolve Project
-  SELECT id INTO v_project_id FROM rag.projects WHERE client_id = v_client_id AND project_key = p_project_key;
-  IF v_project_id IS NULL THEN
-    INSERT INTO rag.projects (client_id, project_key, name) VALUES (v_client_id, p_project_key, p_project_key) RETURNING id INTO v_project_id;
-  END IF;
-
-  -- 3. Resolve Conversation
-  SELECT id INTO v_conv_id FROM rag.conversations WHERE project_id = v_project_id AND thread_key = p_conversation_key;
   IF v_conv_id IS NULL THEN
-    INSERT INTO rag.conversations (client_id, project_id, thread_key, title) 
-    VALUES (v_client_id, v_project_id, p_conversation_key, 'New Conversation') 
+    INSERT INTO rag.conversations (client_id, project_id, channel, thread_key, title, metadata)
+    VALUES (p_client_id, p_project_id, p_channel, p_thread_key, p_title, p_conv_meta)
     RETURNING id INTO v_conv_id;
+    v_is_new := true;
   END IF;
 
-  -- 4. Create Run
+  -- 2. Create run
   INSERT INTO rag.runs (client_id, project_id, conversation_id, run_type, metadata)
-  VALUES (v_client_id, v_project_id, v_conv_id, p_run_type, p_metadata)
+  VALUES (p_client_id, p_project_id, v_conv_id, p_kind, p_run_meta)
   RETURNING id INTO v_run_id;
 
-  RETURN v_run_id;
+  -- 3. Touch conversation
+  UPDATE rag.conversations SET last_event_at = now() WHERE id = v_conv_id;
+
+  RETURN QUERY SELECT v_conv_id, v_run_id, v_is_new;
 END;
 $$;
 
--- FUNCTION: log_event
--- Maps to "Log user message" / "Log tool_call" nodes in n8n
+-- FUNCTION: log_event (9-argument version)
+-- Used by WF_40 "Log user message", "Log assistant message", "Log action draft".
+-- Used by WF_41 "Log approval", "Log tool_call", "Log tool_result", "Log Error".
 CREATE OR REPLACE FUNCTION rag.log_event(
-  p_run_id uuid,
-  p_event_type text,
-  p_actor_role text,
-  p_content text,
-  p_payload jsonb DEFAULT '{}'::jsonb
-) RETURNS uuid
+  p_client_id       uuid,
+  p_project_id      uuid,
+  p_conversation_id uuid,
+  p_run_id          uuid,
+  p_actor_type      text,
+  p_actor_name      text,
+  p_event_type      text,
+  p_name            text,
+  p_payload         jsonb DEFAULT '{}'::jsonb
+)
+RETURNS uuid
 LANGUAGE plpgsql
 AS $$
 DECLARE
   v_id uuid;
-  v_project_id uuid;
-  v_client_id uuid;
 BEGIN
-  -- Get context from run
-  SELECT project_id, client_id INTO v_project_id, v_client_id FROM rag.runs WHERE id = p_run_id;
-
-  INSERT INTO rag.events (run_id, project_id, client_id, event_type, actor_role, content, payload)
-  VALUES (p_run_id, v_project_id, v_client_id, p_event_type, p_actor_role, p_content, p_payload)
+  INSERT INTO rag.events (
+    run_id, client_id, project_id, conversation_id,
+    actor_type, actor_name, event_type, name, payload
+  )
+  VALUES (
+    p_run_id, p_client_id, p_project_id, p_conversation_id,
+    p_actor_type, p_actor_name, p_event_type, p_name, p_payload
+  )
   RETURNING id INTO v_id;
-  
-  -- Update conversation timestamp
-  UPDATE rag.conversations 
-  SET last_event_at = now() 
-  WHERE id = (SELECT conversation_id FROM rag.runs WHERE id = p_run_id);
+
+  -- Touch conversation timestamp
+  IF p_conversation_id IS NOT NULL THEN
+    UPDATE rag.conversations SET last_event_at = now()
+    WHERE id = p_conversation_id;
+  END IF;
 
   RETURN v_id;
 END;
 $$;
 
 -- FUNCTION: finish_run
+-- Used by WF_41 "Finish run" node.
+-- Accepts optional summary text and metadata merge.
 CREATE OR REPLACE FUNCTION rag.finish_run(
-  p_run_id uuid,
-  p_status text DEFAULT 'completed'
-) RETURNS void
+  p_run_id   uuid,
+  p_status   text  DEFAULT 'completed',
+  p_summary  text  DEFAULT NULL,
+  p_metadata jsonb DEFAULT NULL
+)
+RETURNS void
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  UPDATE rag.runs 
-  SET status = p_status, finished_at = now() 
+  UPDATE rag.runs
+  SET status      = p_status,
+      finished_at = now(),
+      summary     = COALESCE(p_summary, summary),
+      metadata    = CASE
+                      WHEN p_metadata IS NOT NULL THEN metadata || p_metadata
+                      ELSE metadata
+                    END
   WHERE id = p_run_id;
 END;
 $$;
 
--- FUNCTION: search_chunks (Semantic Search Helper)
+-- FUNCTION: search_chunks (Semantic search)
+-- Used by memory_workflows.json "Postgres Search" node.
 CREATE OR REPLACE FUNCTION rag.search_chunks(
-  p_project_key text,
-  p_embedding vector(1536),
+  p_project_key     text,
+  p_embedding       vector(1536),
   p_match_threshold float,
-  p_match_count int
+  p_match_count     int
 )
 RETURNS TABLE (
-  id uuid,
-  content text,
+  id         uuid,
+  content    text,
   similarity float,
-  metadata jsonb
+  metadata   jsonb
 )
 LANGUAGE plpgsql
 AS $$
@@ -245,7 +303,7 @@ BEGIN
   FROM rag.chunks c
   JOIN rag.projects p ON c.project_id = p.id
   WHERE p.project_key = p_project_key
-  AND 1 - (c.embedding <=> p_embedding) > p_match_threshold
+    AND 1 - (c.embedding <=> p_embedding) > p_match_threshold
   ORDER BY c.embedding <=> p_embedding
   LIMIT p_match_count;
 END;

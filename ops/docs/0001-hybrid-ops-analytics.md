@@ -15,5 +15,6 @@
 - Simplifies deployment: MindsDB can be added or removed without affecting core operations.
 
 ## Current State
-- MindsDB is **not deployed** in the current Coolify stack (commented out in docker-compose.yml).
-- Can be re-enabled when batch analytics are needed.
+- MindsDB is deployed in the docker-compose stack (active, not commented out).
+- MindsDB connects to Postgres via `mindsdb_ro` read-only role.
+- Results written to `analytics.*` schema. See [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md).

@@ -12,8 +12,8 @@ Paste `ops/infra/docker-compose.yml` content.
 
 ### 2. Environment Variables
 Set via Coolify UI (never commit to git):
-- `POSTGRES_DB=n8n`
-- `POSTGRES_USER=n8n`
+- `POSTGRES_DB=janagi`
+- `POSTGRES_USER=janagi`
 - `POSTGRES_PASSWORD=<strong-password>`
 - `N8N_ENCRYPTION_KEY=<32+ chars>`
 - `OPENAI_API_KEY=<your-key>`
@@ -27,7 +27,7 @@ Ensure these volumes persist across deploys:
 On first deploy, init scripts run automatically.
 For existing databases, run manually:
 ```bash
-docker exec -i <postgres-container> psql -U n8n -d n8n < ops/infra/postgres/init/020_rag_schema.sql
+docker exec -i <postgres-container> psql -U janagi -d janagi < ops/infra/postgres/init/020_rag_schema.sql
 ```
 
 ### 5. Import Workflows
@@ -35,14 +35,14 @@ In n8n UI: Import JSON files from `ops/n8n/`.
 
 ### 6. Configure Credentials
 In n8n Credentials:
-- **Postgres**: host=`postgresql`, port=5432, db=`n8n`, user=`n8n`
+- **Postgres**: host=`postgres` (docker-compose) or `janagi-db` (Coolify), port=5432, db=`janagi`, user=`janagi`
 - **Telegram Bot**: your bot token
-- **OpenAI**: API key
+- **OpenAI**: API key (for embeddings)
 - **HTTP Header Auth** (optional): OpenClaw gateway token
 
 ## Health Checks
 - n8n: `https://your-domain.com/healthz`
-- Postgres: `pg_isready -U n8n -d n8n`
+- Postgres: `pg_isready -U janagi -d janagi`
 
 ## Backup
 ```bash

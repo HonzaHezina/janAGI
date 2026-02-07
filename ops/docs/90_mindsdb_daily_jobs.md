@@ -10,8 +10,8 @@ Doporučený pattern:
 CREATE DATABASE janagi_pg
 WITH ENGINE = 'postgres',
 PARAMETERS = {
-  "host": "postgres",
-  "port": "5432",
+  "host": "postgres",        -- docker-compose service name
+  "port": "5432",            -- Coolify: use "janagi-db" as host
   "user": "mindsdb_ro",
   "password": "*****",
   "database": "janagi",

@@ -1,34 +1,30 @@
 # janAGI Docker Stack
 # Deploy via Coolify or `docker compose up -d`
 #
-# COOLIFY HOSTNAME CONVENTION:
-#   Rename resources in Coolify to short names: n8n, openclaw, mindsdb, janagi-db
-#   Coolify uses the resource name as the internal Docker hostname.
+# HOSTNAMES:
+#   Docker Compose: service name = hostname (postgres, n8n, mindsdb)
+#   Coolify:        rename resources to short names (janagi-db, n8n, openclaw, mindsdb)
 #
-# DATABASE SEPARATION:
-#   - postgres service hosts TWO databases:
-#     1) 'n8n' — n8n internal state (workflows, credentials, executions)
-#     2) 'janagi' — domain data (rag.*, analytics.*)
-#   - n8n connects to 'n8n' DB for its own state
-#   - n8n Postgres nodes connect to 'janagi' DB for business data
-#   - MindsDB connects to 'janagi' DB as read-only
+# DATABASE:
+#   Local dev: one DB (janagi) with rag.* and analytics.* schemas.
+#              n8n stores its own tables in the public schema of the same DB.
+#   Coolify:   two separate DBs recommended (n8n + janagi). See ARCHITECTURE.md.
 
 services:
   postgres:
     image: pgvector/pgvector:0.8.0-pg16
-    # In Coolify, rename this resource to "janagi-db" for stable hostname
     restart: unless-stopped
     env_file: .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-n8n}
-      POSTGRES_USER: ${POSTGRES_USER:-n8n}
+      POSTGRES_DB: ${POSTGRES_DB:-janagi}
+      POSTGRES_USER: ${POSTGRES_USER:-janagi}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TZ: ${TZ:-Europe/Prague}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-n8n} -d ${POSTGRES_DB:-n8n}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-janagi} -d ${POSTGRES_DB:-janagi}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -41,12 +37,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # n8n internal DB (stores workflows, credentials)
+      # n8n connects to the same Postgres instance.
+      # Local dev: uses janagi DB (shared). Coolify: use separate n8n DB.
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
       DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-n8n}
-      DB_POSTGRESDB_USER: ${POSTGRES_USER:-n8n}
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB:-janagi}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:-janagi}
       DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
 
       # n8n server config

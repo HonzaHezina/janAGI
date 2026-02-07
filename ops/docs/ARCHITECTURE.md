@@ -12,12 +12,12 @@ with long-term memory, project management capabilities, and safe action executio
 
 | Database | Owner | Purpose |
 |----------|-------|---------|
-| `n8n` | `n8n` | n8n internal state (workflows, credentials, executions) — **never put business data here** |
 | `janagi` | `janagi` | Domain data: `rag.*` (events, memory, RAG), `analytics.*` (scores, trends) |
+| `n8n` (Coolify only) | `n8n` | n8n internal state (workflows, credentials, executions) — **optional separation** |
 
-> **Why separate?** n8n upgrades can migrate its own DB schema. If your business data
-> is in the same DB, a bad n8n migration could lock or corrupt your data. Keeping them
-> apart means n8n and janAGI can evolve independently.
+> **Local dev:** one DB (`janagi`) used by both n8n and business data (n8n uses `public` schema).
+> **Coolify prod:** two separate DBs recommended. n8n upgrades can migrate its own DB schema;
+> keeping them apart means n8n and janAGI evolve independently.
 
 Schemas in `janagi` DB:
 - `rag.*` — Core operational data: clients, projects, conversations, runs, events, artifacts, and the RAG vector store (sources → documents → chunks with HNSW index).
@@ -28,10 +28,10 @@ Extensions: `vector`, `pgcrypto`, `pg_trgm`, `unaccent`.
 ### n8n (Orchestration Layer)
 Master workflow engine. Four main flows:
 
-1. **Chat Orchestrator** (`main_chat_orchestrator.json`)
-   - Telegram Trigger → `rag.start_run()` → `rag.log_event()` → RAG Search → AI Agent → Parse Actions → Reply
+1. **Chat Orchestrator** (`WF_40_Jackie_Telegram_Assistant.json`)
+   - Telegram Trigger → `rag.start_run_for_thread()` → `rag.log_event()` → Load History → AI Agent → Parse Actions → Reply
    - Automatically extracts facts for memory storage (`[[MEMORY: ...]]`)
-   - Can trigger sub-workflows (`[[TRIGGER_SPEC: ...]]`)
+   - Can trigger sub-workflows (`[[TRIGGER_SPEC: ...]]`) or ACTION_DRAFTs
 
 2. **Memory API** (`memory_workflows.json`)
    - `POST /webhook/memory-upsert` — Embed + store content into `rag.chunks`
@@ -99,7 +99,8 @@ sequenceDiagram
     participant AI as OpenClaw/Jackie
 
     U->>N: Message
-    N->>DB: start_run() + log_event('user')
+    N->>DB: start_run_for_thread()
+    N->>DB: log_event('user')
     N->>DB: search_chunks(query)
     DB-->>N: Related context
     N->>AI: Prompt + context
@@ -115,7 +116,7 @@ sequenceDiagram
     end
     
     N->>U: Reply
-    N->>DB: finish_run()
+    N->>DB: finish_run('success')
 ```
 
 ## Networking (Coolify Docker Stack)
@@ -146,9 +147,10 @@ except n8n webhooks** (which Coolify proxies via HTTPS).
 | OpenClaw | n8n API | `http://n8n:5678/api/v1/` |
 | MindsDB | janagi DB | `janagi-db:5432` (read-only) |
 
-> `postgresql` hostname (Coolify-managed Postgres) is used for **n8n's own internal DB**.
-> `janagi-db` is the **domain/business database**. They can be the same Postgres instance
-> with two databases, or two separate instances.
+> `postgres` (docker-compose service name) resolves via Docker DNS.
+> In Coolify, rename the Postgres resource to `janagi-db` for the same effect.
+> n8n's own internal DB can be a separate database on the same instance (Coolify)
+> or the same `janagi` database (docker-compose dev).
 
 ### Verify DNS from Inside a Container
 

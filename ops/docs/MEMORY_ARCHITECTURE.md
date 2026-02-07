@@ -7,16 +7,18 @@ All data flows through the `rag.*` schema — there is no separate `chat.*` sche
 
 - **Short-term memory**: `rag.events` (append-only message log per conversation)
 - **Long-term memory**: `rag.chunks` (embedded text for semantic search)
-- **Artifacts**: `rag.artifacts` (generated files, specs, diffs)
+- **Artifacts**: `rag.artifacts` (generated files, specs, results)
+
+Full column definitions: [DB_SCHEMA.md](DB_SCHEMA.md)
 
 ## Memory Access Patterns
 
 ### From n8n (Direct SQL)
 n8n uses Postgres nodes to call stored functions:
-- `rag.start_run()` — Initialize a session
-- `rag.log_event()` — Record messages, tool calls, errors
+- `rag.start_run_for_thread()` — Initialize a session (resolves/creates conversation)
+- `rag.log_event()` — Record messages, tool calls, errors (9-arg version)
 - `rag.search_chunks()` — Semantic search over knowledge base
-- `rag.finish_run()` — Close session
+- `rag.finish_run()` — Close session (with optional summary + metadata)
 
 ### From OpenClaw (via n8n Webhooks)
 OpenClaw cannot access the database directly. It uses HTTP webhooks:
@@ -33,20 +35,20 @@ sequenceDiagram
     participant AI as AI Agent
 
     U->>N: Message
-    N->>DB: rag.start_run('janagi', 'janagi', chat_id, 'chat')
-    N->>DB: rag.log_event(run_id, 'message', 'user', text)
+    N->>DB: rag.start_run_for_thread(client_id, project_id, 'telegram', chat_id, 'chat', ...)
+    N->>DB: rag.log_event(client_id, project_id, conv_id, run_id, 'user', from_id, 'message', NULL, payload)
     N->>DB: rag.search_chunks('janagi', embed(text), 0.5, 5)
     DB-->>N: Top-K relevant chunks
     N->>AI: System prompt + context + user message
     AI-->>N: Response (may include [[MEMORY: ...]])
-    N->>DB: rag.log_event(run_id, 'message', 'assistant', response)
+    N->>DB: rag.log_event(..., 'n8n', 'ai_jackie', 'message', NULL, payload)
     
     opt Agent extracted a fact
         N->>DB: INSERT INTO rag.chunks (embed + store)
     end
     
     N->>U: Telegram reply
-    N->>DB: rag.finish_run(run_id)
+    N->>DB: rag.finish_run(run_id, 'success')
 ```
 
 ## Workflow: Memory Upsert (Webhook API)

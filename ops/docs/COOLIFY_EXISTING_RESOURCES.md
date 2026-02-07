@@ -80,10 +80,13 @@ Each container has its own network namespace. Use the Docker service name instea
 Common mistake:
 ```
 # WRONG (will fail with "Connection Refused")
-postgresql://localhost:5432/n8n
+postgresql://localhost:5432/janagi
 
-# CORRECT
-postgresql://n8n:password@postgresql:5432/n8n
+# CORRECT (docker-compose)
+postgresql://janagi:password@postgres:5432/janagi
+
+# CORRECT (Coolify with renamed resource)
+postgresql://janagi:password@janagi-db:5432/janagi
 ```
 
 ### pgvector
@@ -96,8 +99,11 @@ They run **only on first database creation** (when the data volume is empty).
 
 To apply schema changes to an existing database:
 ```bash
-# Connect to Postgres from the n8n container or via psql
-psql -h postgresql -U n8n -d n8n -f /path/to/script.sql
+# docker-compose:
+psql -h postgres -U janagi -d janagi -f /path/to/script.sql
+
+# Coolify (resource renamed to janagi-db):
+psql -h janagi-db -U janagi -d janagi -f /path/to/script.sql
 ```
 
 ### Volumes
