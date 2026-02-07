@@ -13,6 +13,72 @@ and delegates all code/spec generation to CLI implementers.
 
 ---
 
+## Design Philosophy: Spec Kit Is Made for CLI Tools
+
+Spec Kit (`specify` CLI) was **designed from the ground up for CLI AI tools** —
+Gemini CLI, GitHub Copilot CLI, Claude CLI, and similar. Its slash commands
+(`/speckit.constitution`, `/speckit.specify`, etc.) are prompts that only make
+sense inside a CLI tool's session. They guide the tool through a structured
+sequence of artifact creation — and the tool does all the thinking and writing.
+
+**OpenClaw is not a Spec Kit user.** OpenClaw is the _manager_ who:
+- Prepares what the CLI tool needs (the task definition, `locked.json`)
+- Kicks the CLI tool off
+- Receives the results back (commits, artifacts, status)
+- Evaluates whether the work is done
+
+This is the fundamental architectural boundary:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     OpenClaw Domain                     │
+│  • Talk to user (REFINE)                                │
+│  • Create GitHub repo                                    │
+│  • Run `specify init --here` (bootstrap only)           │
+│  • Create branches                                       │
+│  • Pass locked.json to CLI tool                          │
+│  • Evaluate validation_commands                          │
+│  • Pick winner, open PR                                  │
+│  • Escalate failures to user                             │
+│                                                          │
+│  ⛔ NEVER: run /speckit.* commands                       │
+│  ⛔ NEVER: write constitution, spec, plan, tasks, code  │
+│  ⛔ NEVER: make creative decisions about implementation │
+└──────────────────────┬──────────────────────────────────┘
+                       │ locked.json + branch name
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│                   CLI Tool Domain                       │
+│  • Receive locked.json with DoD + acceptance criteria   │
+│  • Run ALL /speckit.* commands in sequence:             │
+│    /speckit.constitution → /speckit.specify →           │
+│    /speckit.plan → /speckit.tasks → /speckit.implement  │
+│  • Write ALL code, tests, docs                          │
+│  • Commit after each phase                               │
+│  • Run validation commands, fix failures                │
+│  • Return status (green/red/escalated) to OpenClaw      │
+│                                                          │
+│  ✅ SOLE OWNER of: Spec Kit artifacts + application code│
+│  ✅ SOLE EXECUTOR of: /speckit.* slash commands         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### What Crosses the Boundary
+
+| Direction              | What                        | Format                |
+|------------------------|-----------------------------|-----------------------|
+| OpenClaw → CLI tool    | Task definition             | `locked.json`         |
+| OpenClaw → CLI tool    | Workspace + branch          | Git branch name + path|
+| CLI tool → OpenClaw    | Completed artifacts + code  | Git commits           |
+| CLI tool → OpenClaw    | Build status                | `green` / `red` / `escalated` |
+| CLI tool → OpenClaw    | Diagnostic (on failure)     | JSON summary          |
+
+**`specify init --here` is the ONLY Spec Kit command OpenClaw ever runs.**
+It scaffolds the `.specify/` directory. Everything after that belongs to the
+CLI tool.
+
+---
+
 ## Role Separation (Definitive)
 
 ### OpenClaw — Dispatcher / Gatekeeper / Jury

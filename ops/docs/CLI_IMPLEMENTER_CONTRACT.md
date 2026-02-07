@@ -8,6 +8,27 @@ agent (Gemini CLI, Copilot CLI, Claude CLI, etc.) invoked by the OpenClaw Dispat
 
 ---
 
+## Why CLI Tools Are the Workers
+
+Spec Kit was **designed specifically for CLI AI tools**. Its `/speckit.*` slash
+commands are structured prompts that guide a CLI tool through artifact creation:
+constitution → spec → plan → tasks → implementation. These commands only make
+sense inside a CLI tool's interactive session.
+
+**The CLI tool is the sole owner of everything that Spec Kit produces.** OpenClaw
+prepares the task (`locked.json`) and hands it off. The CLI tool:
+1. Receives `locked.json` (what to build, DoD, acceptance criteria)
+2. Runs ALL `/speckit.*` commands in sequence
+3. Writes ALL code, tests, docs
+4. Commits and pushes to its `impl/<agent>` branch
+5. Returns status (`green` / `red` / `escalated`) back to OpenClaw
+
+OpenClaw never touches `/speckit.*` commands, never writes code, and never
+creates Spec Kit artifacts. It only bootstraps the repo (`specify init --here`)
+and evaluates the result.
+
+---
+
 ## 1. Role Definition
 
 **Role:** CLI Implementer (End-to-End Autonomous Builder)

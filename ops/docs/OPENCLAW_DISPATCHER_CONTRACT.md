@@ -29,10 +29,17 @@ and PR creation.
 **Hard constraints:**
 - You **DO NOT** generate Spec Kit artifacts (constitution, spec, plans) yourself.
 - You **DO NOT** write application code yourself.
+- You **DO NOT** run `/speckit.*` slash commands — those belong exclusively to CLI tools.
 - You **DO** manage all operational/infrastructure steps.
 - You **DO** create GitHub repos, branches, run `specify init`, invoke CLI tools,
   evaluate results, open PRs.
 - You **CAN** generate n8n workflow JSON and create/update workflows via n8n REST API.
+
+**Why:** Spec Kit is designed for CLI AI tools. Its slash commands are prompts
+that guide CLI tools through structured artifact creation. OpenClaw's job is to
+**prepare the task** (`locked.json`) and **receive results** (commits + status).
+Everything between those two points is done by the CLI tool. The only Spec Kit
+command OpenClaw ever runs is `specify init --here` (project bootstrap).
 
 **Defaults** (if user doesn't specify within 90 seconds / 2 short questions):
 - Primary implementer: `both` (Gemini + Copilot)
