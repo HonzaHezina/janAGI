@@ -21,6 +21,12 @@ Create a dedicated user in n8n with minimal permissions needed to create/edit wo
 
 Store these as Coolify secrets.
 
+Required envs:
+- `N8N_INTERNAL_URL` (e.g., `http://n8n:5678` on internal network)
+- `N8N_OPERATOR_EMAIL`, `N8N_OPERATOR_PASSWORD`
+- `OPENCLAW_GATEWAY_TOKEN`, `OPENCLAW_BASE_URL` (internal-only)
+- (Optional) `N8N_API_KEY` if you also allow API-based builder in the same flow
+
 ---
 
 ## 2) Ensure internal routing works (no public ports)
@@ -48,6 +54,14 @@ Output JSON should include:
 - `evidence` (screenshots paths or textual evidence)
 - `workflow_export` (JSON string if possible)
 - `notes`
+
+Decision table (Builder vs UI Operator vs Turbo raw):
+- Use **API Builder** (WF_20) when the change can be fully expressed as n8n JSON (preferred, testable, versionable).
+- Use **UI Operator** (WF_11) when you must click the UI (e.g., credential wiring, manual drag/drop) and need evidence/export.
+- Use **Turbo raw** (WF_10/12/48) for one-off web fetch/search or lightweight actions without UI changes.
+
+Router context:
+- WF_42 categories: DEV → WF_49 (SpecKit webhook) by default. If the user explicitly asks to “create/update workflow in n8n UI”, WF_42 can dispatch to WF_48 (web) or a dedicated UI-operator subflow using this contract.
 
 ---
 

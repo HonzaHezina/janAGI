@@ -30,3 +30,14 @@ Leads/messages can include personal data. Add a retention policy (e.g., delete/a
 - `/v1/responses` and `/v1/chat/completions` are **disabled by default**; only enable what you need.
 - Prefer internal-only networking (`http://openclaw:18789`) and auth tokens.
 - Consider a dedicated `ui-operator` agent with strict tool allowlist and a separate session key.
+
+## Credential map for Jackie router/subflows
+- Telegram bot token — WF_40/WF_42 triggers and replies
+- Postgres (`rag.*`) — logging runs/events/artifacts
+- Google Calendar/Tasks/Gmail creds — WF_43/44/45
+- OpenClaw bearer (`OPENCLAW_GATEWAY_TOKEN`) — WF_10/11/12/41/48 and any Turbo calls
+- n8n operator creds (`N8N_OPERATOR_EMAIL`, `N8N_OPERATOR_PASSWORD`) — UI operator pattern
+- n8n API key (`N8N_API_KEY`) — API builder pattern
+- SpecKit webhook/base URL — WF_49
+
+Use env/secrets only; do not embed IDs or tokens directly in workflow JSON. Rotate credentials if exported or leaked.

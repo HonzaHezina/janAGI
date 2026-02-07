@@ -12,6 +12,19 @@ Import these JSON files in n8n:
 | `WF_40_Jackie_Telegram_Assistant.json` | **LIVE** — Main Jackie AI assistant (Telegram → AI → ACTION_DRAFT / reply) |
 | `WF_41_Jackie_Action_Subflow.json` | **LIVE** — Approved action executor (callback → OpenClaw → artifact → reply) |
 
+### Router + domain branches (new)
+
+| File | Purpose | Status |
+|------|---------|--------|
+| `WF_42_Jackie_Classifier.json` | Telegram classifier/dispatcher with ACK; routes MEETING/TASK/EMAIL/CHAT/WEB/DEV/UNKNOWN to subflows | Import + set workflowIds |
+| `WF_43_Jackie_Meeting.json` | Meeting/calendar handling | Template |
+| `WF_44_Jackie_Task.json` | Task/reminder handling | Template |
+| `WF_45_Jackie_Email.json` | Gmail search/read/send | Template |
+| `WF_46_Jackie_Chat.json` | Chat/LLM + RAG | Template |
+| `WF_47_Jackie_Clarify.json` | Clarifying question when uncertain | Template |
+| `WF_48_Jackie_Web.json` | Web browse/search via OpenClaw | Template |
+| `WF_49_Jackie_SpecKit.json` | Spec Kit webhook trigger for DEV intents | Template |
+
 ### Active Templates
 
 | File | Purpose |
@@ -63,3 +76,9 @@ See docs:
 - [ops/docs/OPENCLAW_TURBO.md](../docs/OPENCLAW_TURBO.md)
 - [ops/docs/ACTION_DRAFT_PROTOCOL.md](../docs/ACTION_DRAFT_PROTOCOL.md)
 - [ops/docs/OPENCLAW_DISPATCHER_CONTRACT.md](../docs/OPENCLAW_DISPATCHER_CONTRACT.md)
+
+## WF_42 routing quick reference
+
+- Categories: MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48, DEV→WF_49, UNKNOWN→WF_47.
+- After import: set each Execute Workflow node in WF_42 to the correct workflowId.
+- Inputs passed: `text`, `chat_id`, `conversation_id`, `run_id`. Return `{ output: "..." }` from subflows for reply logging.

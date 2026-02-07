@@ -38,6 +38,8 @@ Telegram Trigger → (voice?) Transcribe → AI Agent
 - if project build → call **OpenClaw** (Spec Kit spec-driven dev + GitHub)
 - if workflow needed → call **OpenClaw** (Workflow Builder)
 
+Router note (WF_42): when using the classifier/dispatcher path, categories map to MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48, DEV→WF_49, UNKNOWN→WF_47. WF_42 sends an ACK first, waits for the subflow result, logs, then replies.
+
 ### Strongly recommended: Action Draft + Approval Gate
 
 For anything that triggers OpenClaw (web browsing, scraping, social media,
@@ -50,6 +52,7 @@ Instead:
 4) Only then call OpenClaw
 
 See: [ops/docs/ACTION_DRAFT_PROTOCOL.md](ops/docs/ACTION_DRAFT_PROTOCOL.md)
+If you keep WF_42 in front of Turbo calls, add an approval step in subflows that perform mutating actions (calendar/task/email/web/spec build/UI edits) when Action Draft is not upstream.
 
 ### What to store in DB
 - `rag.events`: every action (messages, tool calls/results, approvals, errors)

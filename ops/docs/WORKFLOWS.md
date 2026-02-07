@@ -11,6 +11,19 @@ These are actively running in production.
 | `WF_40_Jackie_Telegram_Assistant.json` | Telegram Trigger | Main Jackie AI assistant: voice/text → history → AI agent → ACTION_DRAFT or reply | `start_run_for_thread`, `log_event` (9-arg) |
 | `WF_41_Jackie_Action_Subflow.json` | Telegram callback | Approved action executor: callback → parse → OpenClaw `/v1/responses` → artifact + reply | `start_run_for_thread`, `log_event`, `finish_run`, `INSERT rag.artifacts` |
 
+### Router + domain branches (new)
+
+| File | Trigger | Purpose | Status |
+|------|---------|---------|--------|
+| `WF_42_Jackie_Classifier.json` | Telegram Trigger | Async classifier/dispatcher with ACK → MEETING/TASK/EMAIL/CHAT/WEB/DEV/UNKNOWN routing to subflows. Passes `text`, `chat_id`, `conversation_id`, `run_id` to subflows; waits for subflow result; logs/finishes run; replies to Telegram. | **Active (workflowIds must be set manually)** |
+| `WF_43_Jackie_Meeting.json` | Execute Workflow | Handle MEETING intents (Calendar) | Template |
+| `WF_44_Jackie_Task.json` | Execute Workflow | Handle TASK intents (Tasks/Reminders) | Template |
+| `WF_45_Jackie_Email.json` | Execute Workflow | Handle EMAIL intents (Gmail search/read/send) | Template |
+| `WF_46_Jackie_Chat.json` | Execute Workflow | Handle CHAT intents (LLM + RAG) | Template |
+| `WF_47_Jackie_Clarify.json` | Execute Workflow | Clarifying question when intent UNKNOWN | Template |
+| `WF_48_Jackie_Web.json` | Execute Workflow | Web browse/search via OpenClaw `/v1/responses` | Template |
+| `WF_49_Jackie_SpecKit.json` | Execute Workflow | Spec Kit webhook trigger for DEV intents | Template |
+
 ## Active Templates
 
 Ready to import and use.
@@ -63,3 +76,12 @@ These use old function signatures or deprecated APIs. Kept for reference only.
 - [SPECKIT_OPENCLAW_CLI.md](SPECKIT_OPENCLAW_CLI.md) — Spec-Kit spec-driven development flow
 - [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md) — OpenClaw generates n8n workflows via API
 - [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md) — MindsDB federated query engine & analytics
+
+## WF_42 routing and wiring guide (summary)
+
+- Categories: MEETING → WF_43, TASK → WF_44, EMAIL → WF_45, CHAT → WF_46, WEB → WF_48, DEV → WF_49, UNKNOWN → WF_47.
+- Subflow inputs (Execute Workflow): `text`, `chat_id`, `conversation_id`, `run_id`.
+- Subflow outputs: return `{ output: "..." }` (used by Log Bot Msg → Telegram Reply).
+- WorkflowIds: set each Execute Workflow node in WF_42 to the correct target after import.
+- Safety: use Action Draft (WF_40/41) for risky actions if you want approvals before WF_42 dispatch.
+- Test matrix (manual): send sample for each category → expect ACK → correct branch → DB logs → Telegram reply.

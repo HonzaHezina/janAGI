@@ -224,3 +224,9 @@ n8n routes it to Telegram for approval, then executes via `WF_41`.
 **Con:** Extra latency (waiting for approval).
 
 Choose **B** for production, **A** for development/testing.
+
+## 9) Router alignment (WF_42)
+
+- WF_42 is the Telegram-facing classifier/dispatcher with an early ACK and `waitForSubWorkflow=true` on Execute Workflow nodes.
+- Category map: MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48 (OpenClaw web), DEV→WF_49 (SpecKit webhook), UNKNOWN→WF_47.
+- If you want approvals before Turbo calls, keep the Action Draft path (WF_40/41) in front of WF_42 or add approval gates inside subflows.

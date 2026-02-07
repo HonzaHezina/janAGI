@@ -256,6 +256,13 @@ Body: <workflow JSON>
 
 See: [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md)
 
+## 5. Jackie router alignment (WF_42 → subflows)
+
+- Classifier categories → subflows: MEETING→WF_43, TASK→WF_44, EMAIL→WF_45, CHAT→WF_46, WEB→WF_48, DEV→WF_49, UNKNOWN→WF_47.
+- Inputs passed to subflows: `text`, `chat_id`, `conversation_id`, `run_id`. Subflows should return `{ output: "..." }` for Telegram Reply.
+- WorkflowIds must be set in WF_42 after import; keep the ACK node enabled for async UX.
+- Safety posture: for mutating actions (calendar/task/email/web/spec build/UI ops), prefer Action Draft via WF_40/41 or an explicit approval step inside the subflow.
+
 ---
 
 ## 5. Combined Mode (REFINE → EXECUTE in One Endpoint)

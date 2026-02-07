@@ -11,6 +11,17 @@ You just describe what you want — OpenClaw generates the workflow JSON,
 n8n applies it through its REST API.
 ---
 
+## When to use Builder vs UI Operator vs Turbo
+
+- **API Builder (this doc, WF_20)** — default for creating/updating workflows; deterministic JSON, easy to diff/test.
+- **UI Operator (WF_11)** — when UI-only steps are required (drag/drop, credential binding) or you need PLAN/APPLY/VERIFY evidence and exported workflow.
+- **Turbo raw (WF_10/12/48)** — quick browse/fetch or ad-hoc actions not changing n8n config.
+
+WF_42 router alignment:
+- DEV intents → WF_49 (SpecKit webhook) by default.
+- “Create/update workflow” intents should prefer API Builder; if the user insists on UI editing, route to UI Operator.
+
+
 ## Recommended architecture
 
 **n8n is the integrator**, OpenClaw is the brain that generates the workflow:
