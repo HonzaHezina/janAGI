@@ -288,7 +288,7 @@
                 "type": "string",
                 "operation": "equals"
               },
-              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
               "rightValue": "MEETING"
             }
           ],
@@ -318,7 +318,7 @@
                 "type": "string",
                 "operation": "equals"
               },
-              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
               "rightValue": "TASK"
             }
           ],
@@ -348,7 +348,7 @@
                 "type": "string",
                 "operation": "equals"
               },
-              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
               "rightValue": "EMAIL"
             }
           ],
@@ -378,7 +378,7 @@
                 "type": "string",
                 "operation": "equals"
               },
-              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
               "rightValue": "CHAT"
             }
           ],
@@ -408,7 +408,7 @@
                 "type": "string",
                 "operation": "equals"
               },
-              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
               "rightValue": "WEB"
             }
           ],
@@ -438,7 +438,7 @@
                 "type": "string",
                 "operation": "equals"
               },
-              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "leftValue": "={{ $('Classify Intent').first().json.categorized_to }}",
               "rightValue": "DEV"
             }
           ],
