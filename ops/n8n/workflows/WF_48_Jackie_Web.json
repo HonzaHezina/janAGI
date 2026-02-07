@@ -56,7 +56,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst content = ($json.output?.[0]?.content || []).map(c => c.text || '').join('\n');\nconst output = content || JSON.stringify($json);\n\nreturn [{\n  json: {\n    output: output.slice(0, 4000),\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id\n  }\n}];\n"
+        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst content = ($json.output?.[0]?.content || []).map(c => c.text || '').join('\\n');\nconst output = content || JSON.stringify($json);\n\nreturn [{\n  json: {\n    output: output.slice(0, 4000),\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id\n  }\n}];\n"
       },
       "id": "c48-output",
       "name": "Build Output",
