@@ -2,21 +2,29 @@
   "name": "WF_48 Jackie Web",
   "nodes": [
     {
-      "parameters": {},
-      "id": "c48-trigger",
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "caba1a4f-11ce-4b7e-8f20-527ab712c743",
       "name": "Execute Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "position": [-400, 300],
+      "position": [
+        -560,
+        -32
+      ],
       "typeVersion": 1.1
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $input.first() ? $input.first().json : {};\nconst text = String(trigger.text || '').trim();\n\nconst prompt = text\n  ? `Search the web for: \"${text}\". Return top 5 results with titles and absolute URLs. If the user provided a specific URL, fetch it and return key facts.`\n  : 'Search the web for recent relevant results. Return top 5 results with titles and absolute URLs.';\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];\n"
+        "jsCode": "// Použijeme $input.all(), což vezme všechna data, která do tohoto uzlu přišla\n// Pokud jsou data prázdná (testování bez vstupu), vytvoříme prázdný objekt, aby to nepadlo\nconst trigger = $input.first() ? $input.first().json : {};\n\n// Bezpečně získáme text\nconst text = String(trigger.text || '').trim();\n\n// Pokud je text prázdný (což při přímém testu sub-workflow bude), použijeme default\nconst prompt = text && text.length > 0\n  ? `Search the web for: \"${text}\". Return top 5 results with titles and absolute URLs. If the user provided a specific URL, fetch it and return key facts.`\n  : 'Search the web for recent relevant results. Return top 5 results with titles and absolute URLs.';\n\nreturn [{\n  json: {\n    // Pokud chat_id neexistuje, dáme tam null nebo placeholder, aby to nepadlo\n    chat_id: trigger.chat_id || null,\n    conversation_id: trigger.conversation_id || null,\n    run_id: trigger.run_id || null,\n    prompt: prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];"
       },
-      "id": "c48-build",
+      "id": "1170041c-b8ea-4d40-b5cb-bf779095aa39",
       "name": "Build Web Prompt",
       "type": "n8n-nodes-base.code",
-      "position": [-120, 300],
+      "position": [
+        -288,
+        -32
+      ],
       "typeVersion": 2
     },
     {
@@ -28,23 +36,38 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "model", "value": "={{ $json.model }}" },
-            { "name": "=input", "value": "={{ $json.prompt }}" }
+            {
+              "name": "model",
+              "value": "={{ $json.model }}"
+            },
+            {
+              "name": "=input",
+              "value": "={{ $json.prompt }}"
+            }
           ]
         },
         "options": {}
       },
-      "id": "c48-http",
+      "id": "43eae826-0ad8-405e-af19-a732508cca40",
       "name": "OpenClaw Request",
       "type": "n8n-nodes-base.httpRequest",
-      "position": [200, 300],
+      "position": [
+        48,
+        -32
+      ],
       "typeVersion": 4.3,
       "credentials": {
         "httpBearerAuth": {
@@ -58,10 +81,13 @@
       "parameters": {
         "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst content = ($json.output?.[0]?.content || []).map(c => c.text || '').join('\\n');\nconst output = content || JSON.stringify($json);\n\nreturn [{\n  json: {\n    output: output.slice(0, 4000),\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id\n  }\n}];\n"
       },
-      "id": "c48-output",
+      "id": "693542f2-2403-40e3-8af4-4a03b818103a",
       "name": "Build Output",
       "type": "n8n-nodes-base.code",
-      "position": [520, 300],
+      "position": [
+        368,
+        -64
+      ],
       "typeVersion": 2
     }
   ],
@@ -69,21 +95,33 @@
     "Execute Workflow Trigger": {
       "main": [
         [
-          { "node": "Build Web Prompt", "type": "main", "index": 0 }
+          {
+            "node": "Build Web Prompt",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Build Web Prompt": {
       "main": [
         [
-          { "node": "OpenClaw Request", "type": "main", "index": 0 }
+          {
+            "node": "OpenClaw Request",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "OpenClaw Request": {
       "main": [
         [
-          { "node": "Build Output", "type": "main", "index": 0 }
+          {
+            "node": "Build Output",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     }
