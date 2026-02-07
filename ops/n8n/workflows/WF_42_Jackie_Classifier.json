@@ -410,8 +410,7 @@
             }
           ],
           "fallbackOutput": 0
-        },
-        "options": {}
+        }
       },
       "id": "switch-classifier-output",
       "name": "Switch Classifier Output",
