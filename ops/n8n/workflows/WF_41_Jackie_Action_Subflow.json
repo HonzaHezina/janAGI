@@ -94,7 +94,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH parent AS (\n  SELECT e.run_id AS parent_run_id\n  FROM rag.events e\n  JOIN rag.conversations c ON c.id = e.conversation_id\n  WHERE c.thread_key = '{{ $json.chat_id }}'::text\n    AND c.channel = 'telegram'\n    AND e.run_id IS NOT NULL\n  ORDER BY e.ts DESC\n  LIMIT 1\n)\nSELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{ $json.chat_id }}'::text,\n  'web_{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}'::text,\n  ('SubRun for chat ' || '{{ $json.chat_id }}')::text,\n  jsonb_build_object(\n    'parent_run_id', (SELECT parent_run_id FROM parent),\n    'tool', 'openclaw',\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}'\n  ),\n  '{}'::jsonb\n);\n",
+        "query": "WITH parent AS (\n  SELECT e.run_id AS parent_run_id\n  FROM rag.events e\n  JOIN rag.conversations c ON c.id = e.conversation_id\n  WHERE c.thread_key = '{{ $json.chat_id }}'::text\n    AND c.channel = 'telegram'\n    AND e.run_id IS NOT NULL\n  ORDER BY e.ts DESC\n  LIMIT 1\n)\nSELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{ $json.chat_id }}'::text,\n  'web_{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}'::text,\n  ('SubRun for chat ' || '{{ $json.chat_id }}')::text,\n  jsonb_build_object(\n    'parent_run_id', (SELECT parent_run_id FROM parent),\n    'tool', 'openclaw',\n    'mode', '{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}'\n  ),\n  '{}'::jsonb\n);\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -115,7 +115,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{$json.conversation_id}}'::uuid,\n  '{{$json.run_id}}'::uuid,\n  'n8n',\n  'subwf:web',\n  'tool_call',\n  'openclaw',\n  jsonb_build_object(\n    'type','web',\n    'target','openclaw',\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}',\n    'model', '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}',\n    'input', '{{ $json.action?.payload?.input || $json.input || \"\" }}'\n  )\n) AS event_id;\n",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{$json.conversation_id}}'::uuid,\n  '{{$json.run_id}}'::uuid,\n  'n8n',\n  'subwf:web',\n  'tool_call',\n  'openclaw',\n  jsonb_build_object(\n    'type','web',\n    'target','openclaw',\n    'mode', '{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}',\n    'model', '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}',\n    'input', '{{ $json.action?.payload?.input || $json.input || \"\" }}'\n  )\n) AS event_id;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -136,7 +136,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO rag.artifacts (\n  client_id, project_id, conversation_id, run_id,\n  kind, title, content_text, metadata\n)\nVALUES (\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $node[\"Start SubRun\"].json.conversation_id }}'::uuid,\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'openclaw_web_result',\n  ('OpenClaw web ' || '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}')::text,\n  '{{ ($json.output?.[0]?.content || []).map(c => c.text || \"\").join(\"\\n\") }}'::text,\n  jsonb_build_object(\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}',\n    'model', '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}',\n    'openclaw_response_id', '{{ $json.id || \"\" }}',\n    'openclaw_message_id', '{{ $json.output?.[0]?.id || \"\" }}'\n  )\n)\nRETURNING id AS artifact_id;\n",
+        "query": "INSERT INTO rag.artifacts (\n  client_id, project_id, conversation_id, run_id,\n  kind, title, content_text, metadata\n)\nVALUES (\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $node[\"Start SubRun\"].json.conversation_id }}'::uuid,\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'openclaw_web_result',\n  ('OpenClaw web ' || '{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}')::text,\n  '{{ ($json.output?.[0]?.content || []).map(c => c.text || \"\").join(\"\\n\") }}'::text,\n  jsonb_build_object(\n    'mode', '{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}',\n    'model', '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}',\n    'openclaw_response_id', '{{ $json.id || \"\" }}',\n    'openclaw_message_id', '{{ $json.output?.[0]?.id || \"\" }}'\n  )\n)\nRETURNING id AS artifact_id;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -157,7 +157,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $node[\"Start SubRun\"].json.conversation_id }}'::uuid,\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'openclaw',\n  '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}'::text,\n  'tool_result',\n  'openclaw',\n  jsonb_build_object(\n    'status','success',\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}',\n    'artifact_id', '{{ $json.artifact_id || \"\" }}'::text\n  )\n) AS event_id;\n",
+        "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $node[\"Start SubRun\"].json.conversation_id }}'::uuid,\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'openclaw',\n  '{{ $json.action?.payload?.model || $json.model || \"openclaw:main\" }}'::text,\n  'tool_result',\n  'openclaw',\n  jsonb_build_object(\n    'status','success',\n    'mode', '{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}',\n    'artifact_id', '{{ $json.artifact_id || \"\" }}'::text\n  )\n) AS event_id;\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -178,7 +178,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.finish_run(\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'success',\n  'Web action completed',\n  jsonb_build_object(\n    'mode', '{{ $json.action?.payload?.mode || $json.mode || \"fetch\" }}'\n  )\n);\n",
+        "query": "SELECT rag.finish_run(\n  '{{ $node[\"Start SubRun\"].json.run_id }}'::uuid,\n  'success',\n  'Web action completed',\n  jsonb_build_object(\n    'mode', '{{ $json.action?.payload?.mode || $json.action?.type || $json.mode || \"fetch\" }}'\n  )\n);\n",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
