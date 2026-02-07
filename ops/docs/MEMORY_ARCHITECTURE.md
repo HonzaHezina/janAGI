@@ -16,18 +16,23 @@ Full column definitions: [DB_SCHEMA.md](DB_SCHEMA.md)
 
 ## Memory Access Patterns
 
-### From n8n (Integrator → Direct SQL)
-n8n (as the integrator) uses Postgres nodes to call stored functions:
-- `rag.start_run_for_thread()` — Initialize a session (resolves/creates conversation)
-- `rag.log_event()` — Record messages, tool calls, errors (9-arg version)
-- `rag.search_chunks()` — Semantic search over knowledge base
-- `rag.finish_run()` — Close session (with optional summary + metadata)
+### 1. From n8n (Integrator → Direct SQL)
+n8n is the **Orchestrator**. It holds the database credentials and manages the session lifecycle.
+- **Read:** Before calling the AI, n8n executes `rag.search_chunks()` and `SELECT FROM rag.events` to build the context window.
+- **Write:** When the AI responds, n8n executes `rag.log_event()` to append the turn to the log.
+- **Integration:** No HTTP API is required. Standard "Postgres" nodes in n8n are sufficient.
 
-### From OpenClaw (Agent Gateway)
-In the V2 architecture, OpenClaw runs as a stateless "Brain". It does not access the database directly or via webhooks. Instead, **n8n (the Router)** is responsible for:
-1.  **Retrieval:** Fetching relevant context via `rag.search_chunks()` *before* calling the agent.
-2.  **Storage:** Logging the conversation to `rag.events`.
-3.  **Upsert:** Long-term memory storage is currently handled by n8n workflows (e.g. `WF_34` or manual tools), not by the agent directly calling webhooks.
+### 2. From MindsDB (Analytics → Direct SQL)
+MindsDB is the **Analyst**. It connects directly to the PostgreSQL instance as a standard data source.
+- **Read:** It queries `rag.events` to analyze trends and `rag.chunks` to understand knowledge coverage.
+- **Write:** It writes computed insights to `analytics.*` tables.
+- **Integration:** Standard SQL Federation (Connect to Postgres).
+
+### 3. From OpenClaw (Brain → via n8n Context)
+OpenClaw is the **Reasoning Engine**. In this V2 architecture, it is effectively **stateless** regarding long-term retention.
+- **Internal Memory Integration:** OpenClaw's internal memory (if enabled via config) should be **disabled** or treated as ephemeral.
+- **Single Source of Truth:** The `rag.*` schema is the only authoritative memory. OpenClaw relies 100% on the context provided by n8n in the `messages` array.
+- **Integration:** n8n acts as the memory driver for OpenClaw. OpenClaw does not connect to the DB directly.
 
 ## Workflow: Chat with Memory (V2 Router)
 

@@ -88,7 +88,22 @@ The unified front-end. Supports:
 
 ---
 
-## Data Flow
+## Data Flow (V2 Router + Shared Memory)
+
+1.  **Ingest (Telegram):** User sends voice/text.
+2.  **Routing (n8n - WF_42):**
+    *   **Classify:** "Brain" (LLM) decides if it's Chat, Task, Web, etc.
+    *   **Context:** Router fetches recent history from `rag.events` (Postgres).
+3.  **Handling (Sub-workflows):**
+    *   **Chat (WF_46):** Fetches semantic context from `rag.chunks`. Calls OpenClaw with full context.
+    *   **Web (WF_48):** Calls OpenClaw (Tools enabled) to browse/scrape. Result stored in `rag.artifacts`.
+    *   **Dev (WF_49):** Calls OpenClaw (Spec Mode) to build software.
+4.  **Execution (Handlers):**
+    *   **MindsDB:** Connects directly to `rag.*`. Runs background jobs to analyze data and update `analytics.*`.
+    *   **OpenClaw:** Stateless execution. Relies on n8n to provide memory context.
+5.  **Persistence (Postgres):**
+    *   All nodes (Router, Handlers) write events to `rag.events`.
+    *   Single Source of Truth. No separate "Bot Memory".
 
 ### The V2 Router Architecture
 

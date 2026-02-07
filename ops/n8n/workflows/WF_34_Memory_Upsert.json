@@ -1,0 +1,92 @@
+{
+  "name": "WF_34 Memory Upsert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "janagi/memory-upsert",
+        "options": {}
+      },
+      "id": "c34-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [-400, 300],
+      "webhookId": "wf34-memory-upsert",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "text": "={{ $json.body.text }}",
+        "options": {}
+      },
+      "id": "c34-embed",
+      "name": "Embed Text",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [-180, 300],
+      "typeVersion": 1,
+      "credentials": {
+        "openAiApi": {
+          "id": "5lko0zqD9vqhajI4",
+          "name": "OpenAi account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO rag.chunks (project_id, content, embedding, metadata)\nSELECT\n  p.id,\n  $1,\n  $2::vector,\n  $3::jsonb\nFROM rag.projects p\nWHERE p.project_key = $4\nRETURNING id;\n",
+        "options": {
+          "queryParameterValues": "={{ {\n  \"$1\": $('Webhook').item.json.body.text,\n  \"$2\": $('Embed Text').item.json.embedding,\n  \"$3\": JSON.stringify($('Webhook').item.json.body.metadata || {}),\n  \"$4\": $('Webhook').item.json.body.namespace || 'janagi'\n} }}"
+        }
+      },
+      "id": "c34-insert",
+      "name": "Insert Chunk",
+      "type": "n8n-nodes-base.postgres",
+      "position": [40, 300],
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, id: $json.id } }}",
+        "options": {}
+      },
+      "id": "c34-response",
+      "name": "Respond",
+      "type": "n8n-nodes-base.webhookResponse",
+      "position": [260, 300],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Embed Text", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Embed Text": {
+      "main": [
+        [
+          { "node": "Insert Chunk", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Insert Chunk": {
+      "main": [
+        [
+          { "node": "Respond", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
