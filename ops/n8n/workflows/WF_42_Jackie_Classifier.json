@@ -314,6 +314,14 @@
       }
     },
     {
+      "id": "7998b0b2-9c99-41d2-8047-a999c9d55c16",
+      "name": "Classify Intent",
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "position": [
+        580,
+        300
+      ],
+      "typeVersion": 1.1,
       "parameters": {
         "inputText": "={{ $('Prepare Context').item.json.text }}",
         "categories": {
@@ -352,76 +360,7 @@
           "systemPromptTemplate": "You are a STRICT intent classifier for the Jackie AI system.\n\nIMPORTANT: You have NO tools. Do NOT call any tools. Do NOT include tool calls, markdown, code fences, or extra text.\n\nTask: Read the Input Text and choose exactly ONE category from: {categories}.\n\nGuidelines (tie-breakers):\n- MEETING: calendar events, scheduling, availability, invitations, dates/times.\n- TASK: todos/reminders, deadlines, 'připomeň', 'úkol'.\n- EMAIL: read/search/reply/send emails, Gmail, mail/pošta.\n- WEB: browse/search current info, verify something on a website, extract from URL.\n- DEV: programming, repo changes, builds/tests, spec-kit.\n- CHAT: general questions, explanation, summary, advice; no external tools required.\n- UNKNOWN: unclear or mixed intent.\n\nOutput only the category name (one word, uppercase)."
         }
       },
-      "id": "7998b0b2-9c99-41d2-8047-a999c9d55c16",
-      "name": "Classify Intent",
-      "type": "@n8n/n8n-nodes-langchain.textClassifier",
-      "position": [
-        580,
-        300
-      ],
-      "typeVersion": 1.1,
       "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
-        "rules": {
-          "rules": [
-            {
-              "value1": "UNKNOWN",
-              "operation": "equal",
-              "value2": "",
-              "output": 0
-            },
-            {
-              "value1": "MEETING",
-              "operation": "equal",
-              "value2": "",
-              "output": 1
-            },
-            {
-              "value1": "TASK",
-              "operation": "equal",
-              "value2": "",
-              "output": 2
-            },
-            {
-              "value1": "EMAIL",
-              "operation": "equal",
-              "value2": "",
-              "output": 3
-            },
-            {
-              "value1": "CHAT",
-              "operation": "equal",
-              "value2": "",
-              "output": 4
-            },
-            {
-              "value1": "WEB",
-              "operation": "equal",
-              "value2": "",
-              "output": 5
-            },
-            {
-              "value1": "DEV",
-              "operation": "equal",
-              "value2": "",
-              "output": 6
-            }
-          ],
-          "fallbackOutput": 0
-        },
-        "options": {}
-      },
-      "id": "switch-classifier-output",
-      "name": "Switch Classifier Output",
-      "type": "n8n-nodes-base.switch",
-      "position": [
-        740,
-        300
-      ],
-      "typeVersion": 3.2
     },
     {
       "parameters": {
