@@ -101,3 +101,24 @@ Aligned all documentation to the correct system paradigm:
 - `0001-hybrid-ops-analytics.md` (ADR) — Updated to reflect integrator paradigm + MindsDB external BI focus
 - `MEMORY_ARCHITECTURE.md` — Access patterns labeled with roles (Integrator/Brain)
 - `OPENCLAW_DISPATCHER_CONTRACT.md` — Fixed `rag.start_run()` → `rag.start_run_for_thread()`
+
+---
+
+## Spec Kit Description Fix (2026-02-07, batch 3)
+
+Corrected Spec Kit descriptions across all docs. Previously described as
+"scaffolding/bootstrap," now correctly framed as GitHub's open-source
+**spec-driven development toolkit** that:
+- Helps OpenClaw ask the user the right questions (mapped to Spec Kit concepts)
+- Ensures CLI tools receive complete, structured specifications from the start
+- Prevents vibe coding through structured refinement (constitution → spec → plan → tasks → implement)
+
+### Files Updated
+
+- `ARCHITECTURE.md` — Vision, dispatcher, hands section, agent architecture ASCII all updated
+- `README.md` — "Spec-Driven Project Builder" (was "Spec-Kit Dispatcher"), tech stack, roadmap
+- `SPECKIT_OPENCLAW_CLI.md` — Complete opening rewrite with proper Spec Kit explanation + GitHub link
+- `OPENCLAW_DISPATCHER_CONTRACT.md` — Opening, "Why" section, REFINE objective rewritten
+- `CLI_IMPLEMENTER_CONTRACT.md` — Title, key principle, "Why CLI Tools" section rewritten
+- `PERSONAL_ASSISTANT_TURBO.md` — Hands description and router updated
+- `WORKFLOWS.md` — Related docs link text updated

@@ -9,8 +9,9 @@ and calls **OpenClaw (Jackie)** as its **brain, hands, and eyes**.
 Jackie (via OpenClaw) can:
 - **Think** — LLM reasoning, decision-making, conversation with memory
 - **See** — browse websites, read social media, scrape content
-- **Act** — create GitHub projects (Spec Kit), delegate coding to CLI tools
-  (Gemini, Copilot), create and modify n8n workflows via API
+- **Act** — build software projects using [Spec Kit](https://github.com/github/spec-kit)
+  (GitHub's spec-driven development toolkit), delegate implementation to
+  CLI tools (Gemini, Copilot), create and modify n8n workflows via API
 
 **MindsDB** serves as the **analytics department** — primarily for external
 business intelligence (combining data from multiple sources: browsing behavior,
@@ -69,8 +70,13 @@ sub-workflow at the right time.
    - `POST /webhook/memory-search` — Embed query + `rag.search_chunks()` → return matches
 
 4. **Spec-Kit Dispatcher** (`spec_kit_workflow.json`)
+   - Uses [Spec Kit](https://github.com/github/spec-kit) methodology: OpenClaw
+     asks the user spec-driven questions (what to build, constraints, acceptance
+     criteria) and helps them figure out what they need
    - REFINE phase: Gather requirements conversationally → produce `locked.json`
-   - EXECUTE phase: Bootstrap repo → run AI implementers → evaluate → create PR
+   - EXECUTE phase: Bootstrap repo with `specify init`, CLI tools run
+     `/speckit.*` slash commands → constitution → spec → plan → tasks → code
+   - Result: CLI tools start with proper, complete specifications — no vibe coding
 
 5. **Workflow Builder** (`WF_20_Builder_Create_Workflow_via_API.json`)
    - OpenClaw generates n8n workflow JSON on demand
@@ -101,8 +107,12 @@ n8n calls OpenClaw whenever it needs thinking, seeing, or acting.
 - Data collection for MindsDB analytics pipeline
 
 **🤲 Hands (Execution):**
-- **Spec Kit + GitHub**: Create repos, bootstrap projects, delegate to CLI tools
-  (Gemini CLI, Copilot CLI), evaluate results, create PRs
+- **Spec Kit + GitHub**: Uses [Spec Kit](https://github.com/github/spec-kit)
+  (GitHub's spec-driven development toolkit) to properly define projects —
+  OpenClaw asks the user the right questions, helps them figure out requirements,
+  locks a complete specification, then delegates implementation to CLI tools
+  (Gemini CLI, Copilot CLI) which receive correct instructions from the start.
+  OpenClaw evaluates results and creates PRs
 - **n8n Workflow Builder**: Generate workflow JSON, create/modify/activate
   workflows via n8n REST API — no manual UI clicking needed
 - **UI Operator**: PLAN → APPLY → VERIFY protocol for any web UI
@@ -317,9 +327,9 @@ The system follows a **"n8n integrates, OpenClaw thinks and acts"** pattern:
 │             (🧠 Brain + 👁️ Eyes + 🤲 Hands)                  │
 ├──────────────┬───────────────┬──────────────┬─────────────┤
 │ 🧠 Chat &    │ 👁️ Web        │ 🤲 Spec Kit  │ 🤲 Workflow  │
-│ Reasoning   │ Browse /     │ + GitHub   │ Builder    │
-│ (LLM +      │ Scrape /     │ + CLI      │ (n8n API)  │
-│  Memory)    │ Social Media │ Delegation │            │
+│ Reasoning   │ Browse /     │ (Spec-     │ Builder    │
+│ (LLM +      │ Scrape /     │ Driven     │ (n8n API)  │
+│  Memory)    │ Social Media │ Dev)       │            │
 ├──────────────┼───────────────┼──────────────┼─────────────┤
 │              │               │              │             │
 │ CLI Tools:   │ Data feeds:   │ Gemini CLI   │ n8n REST    │

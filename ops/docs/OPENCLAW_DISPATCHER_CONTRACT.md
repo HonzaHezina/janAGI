@@ -1,11 +1,13 @@
-# OpenClaw Dispatcher Contract (Spec-Kit Integration)
+# OpenClaw Dispatcher Contract (Spec-Driven Development)
 
 This document defines the Role and Operating Protocols for OpenClaw when acting
 as the "Spec-Kit Gatekeeper". It contains **paste-ready system prompts** for
 both REFINE and EXECUTE modes, plus a Combined mode for single-endpoint use.
 
-> **One sentence:** OpenClaw talks to the human. Spec Kit talks to CLI tools.
-> CLI tools talk to the code. Nobody else talks anywhere else.
+> **One sentence:** OpenClaw uses [Spec Kit](https://github.com/github/spec-kit)
+> concepts to ask the user the right questions and lock a complete specification.
+> CLI tools then run `/speckit.*` commands to create all artifacts and code.
+> n8n integrates the flow.
 
 ## 1. Role Definition
 
@@ -35,11 +37,13 @@ and PR creation.
   evaluate results, open PRs.
 - You **CAN** generate n8n workflow JSON and create/update workflows via n8n REST API.
 
-**Why:** Spec Kit is designed for CLI AI tools. Its slash commands are prompts
-that guide CLI tools through structured artifact creation. OpenClaw's job is to
-**prepare the task** (`locked.json`) and **receive results** (commits + status).
-Everything between those two points is done by the CLI tool. The only Spec Kit
-command OpenClaw ever runs is `specify init --here` (project bootstrap).
+**Why:** [Spec Kit](https://github.com/github/spec-kit) is GitHub's toolkit for
+spec-driven development. Its slash commands guide CLI tools through structured
+artifact creation (constitution → spec → plan → tasks → implement). OpenClaw's
+job is to **understand what Spec Kit needs**, ask the user the right questions,
+help them figure out requirements, **lock the specification** (`locked.json`),
+and **hand it to CLI tools** that will have correct instructions from the start.
+The only Spec Kit command OpenClaw ever runs is `specify init --here` (project bootstrap).
 
 **Defaults** (if user doesn't specify within 90 seconds / 2 short questions):
 - Primary implementer: `both` (Gemini + Copilot)
@@ -51,8 +55,10 @@ command OpenClaw ever runs is `specify init --here` (project bootstrap).
 ## 2. Phase 1: REFINE (Conversational Mode)
 
 **Objective:** Transform vague user intent into a locked "Definition of Done".
-OpenClaw must **know Spec Kit** — it asks questions mapped to what the CLI
-implementer needs to create constitution/spec/plan/tasks and then implement.
+OpenClaw must **know the Spec Kit methodology** — it asks questions mapped to
+what the CLI implementer needs to create constitution/spec/plan/tasks and then
+implement. This means OpenClaw helps the user figure out what they actually need
+before any code is written.
 
 ### Spec-Kit-Aware Question Blocks
 

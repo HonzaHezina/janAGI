@@ -11,7 +11,7 @@ and knowledge system — all accessible via **Telegram**.
 ## What It Does
 
 1. **Telegram Chat with Memory** — Jackie remembers conversations, facts, and context using vector search (RAG).
-2. **Spec-Kit Dispatcher** — Jackie can scaffold new software projects: gather requirements, lock specs, delegate implementation to AI coders (Gemini/Copilot), evaluate results, and create PRs. OpenClaw does everything you'd do manually — repo, branches, Spec Kit bootstrap, CLI invocation, PR.
+2. **Spec-Driven Project Builder** — Jackie uses [Spec Kit](https://github.com/github/spec-kit) (GitHub's spec-driven development toolkit) to properly define new software projects. OpenClaw asks the user what's needed, helps them figure out requirements and constraints, and locks a complete specification. Then it delegates implementation to AI coders (Gemini/Copilot CLI) who receive correct instructions from the start — constitution, spec, plan, tasks, code. No vibe coding.
 3. **n8n Workflow Builder** — Tell OpenClaw what workflow you need and it generates the n8n JSON, then n8n creates it via its REST API. No manual clicking.
 4. **Knowledge Base** — Ingest documents, URLs, and notes into a searchable vector store.
 5. **Action Draft Protocol** — For risky operations, Jackie proposes an action draft and waits for human approval via Telegram before executing.
@@ -87,7 +87,7 @@ flowchart LR
 | Chat Interface | Telegram Bot | User interaction |
 | Hosting | Coolify on Hostinger VPS | Docker stack management |
 | Embeddings | OpenAI text-embedding-3-small (1536d) | Semantic search |
-| CLI Tools | Gemini CLI, Copilot CLI | Code implementation (delegated by OpenClaw via Spec Kit) |
+| CLI Tools | Gemini CLI, Copilot CLI | Code implementation — receive complete specs from Spec Kit, run `/speckit.*` commands |
 
 ---
 
@@ -119,7 +119,7 @@ Full docs: [`ops/docs/DB_SCHEMA.md`](ops/docs/DB_SCHEMA.md)
 | `WF_40_Jackie_Telegram_Assistant.json` | **LIVE** — Jackie AI: Telegram → voice/text → history → AI agent → reply or ACTION_DRAFT |
 | `WF_41_Jackie_Action_Subflow.json` | **LIVE** — Approved action executor via OpenClaw |
 | `memory_workflows.json` | Webhook API: `/memory-upsert` and `/memory-search` |
-| `spec_kit_workflow.json` | Spec-Kit: Refine requirements → Lock spec → Execute build |
+| `spec_kit_workflow.json` | Spec-Kit: Refine requirements with user → Lock spec → CLI tools execute build |
 
 ### Supporting Templates
 | File | Purpose |
@@ -242,12 +242,12 @@ janAGI/
 - [x] Memory API workflows (upsert/search)
 - [x] Main chat orchestrator (WF_40 Telegram)
 - [x] Action subflow with approval gate (WF_41)
-- [x] Spec-Kit dispatcher contract + CLI implementer contract
+- [x] Spec-Kit spec-driven development contract + CLI implementer contract
 - [x] n8n Workflow Builder (API-first)
 - [x] MindsDB integration (analytics schema + batch jobs)
 - [ ] Live Telegram bot deployment on Coolify
 - [ ] Document ingestion pipeline (URLs, PDFs)
-- [ ] Spec-Kit full autopilot (end-to-end parallel builds)
+- [ ] Spec-Kit full autopilot (end-to-end spec-driven parallel builds)
 - [ ] Web scraping data pipelines (social media, competitors)
 - [ ] MindsDB external analytics (multi-source BI dashboards)
 - [ ] Dashboard UI (bolt.diy or custom)

@@ -5,7 +5,7 @@ n8n is the **integrator/curator** — it manages state, gates, and routing.
 OpenClaw (Jackie) is the **brain, hands, and eyes**:
 - **🧠 Brain**: LLM reasoning, decisions, conversation with memory
 - **👁️ Eyes**: browse websites, scrape content, read social media, monitor competitors
-- **🤲 Hands**: create GitHub projects (Spec Kit), write n8n workflows, execute approved actions
+- **🤲 Hands**: build software projects using [Spec Kit](https://github.com/github/spec-kit) (spec-driven development — ask user what's needed, lock specs, delegate to CLI tools with correct instructions), write n8n workflows, execute approved actions
 
 ## Design principles
 
@@ -32,7 +32,7 @@ Telegram Trigger → (voice?) Transcribe → AI Agent
 - if LLM can answer directly → reply
 - if tool needed → call tool (Gmail, Calendar, DB…)
 - if web task needed → call **OpenClaw** (browse, scrape, social media)
-- if project build → call **OpenClaw** (Spec Kit + GitHub)
+- if project build → call **OpenClaw** (Spec Kit spec-driven dev + GitHub)
 - if workflow needed → call **OpenClaw** (Workflow Builder)
 
 ### Strongly recommended: Action Draft + Approval Gate

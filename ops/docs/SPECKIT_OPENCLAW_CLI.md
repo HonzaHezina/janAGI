@@ -1,9 +1,20 @@
-# Spec Kit + OpenClaw + CLI Implementers — Autopilot Architecture
+# Spec Kit + OpenClaw + CLI Implementers — Spec-Driven Development
 
-This document defines the **end-to-end autonomous build flow** in janAGI:
-n8n (integrator) routes the request, OpenClaw (brain+hands) refines the intent
-with the user, bootstraps the repo with Spec Kit, and delegates all code/spec
-generation to CLI implementers (Gemini, Copilot).
+[Spec Kit](https://github.com/github/spec-kit) is GitHub's open-source toolkit
+for **Spec-Driven Development** — a methodology where specifications are created
+*before* implementation, through a structured sequence of refinement steps
+(constitution → specify → plan → tasks → implement).
+
+In janAGI, Spec Kit serves a critical role: it ensures that **OpenClaw properly
+defines what to build** before any code is written. OpenClaw uses Spec Kit's
+concepts to ask the user the right questions, help them figure out what they
+need, and lock a complete specification. Then CLI tools (Gemini, Copilot)
+receive that specification and have correct, structured instructions from the
+very start — no guessing, no vibe coding.
+
+The flow: n8n (integrator) routes the request → OpenClaw (brain+hands) refines
+the intent with the user using Spec Kit concepts → CLI tools run Spec Kit's
+`/speckit.*` slash commands to create all artifacts and code.
 
 ## Guiding Principle
 
@@ -14,15 +25,21 @@ generation to CLI implementers (Gemini, Copilot).
 
 ---
 
-## Design Philosophy: Spec Kit Is Made for CLI Tools
+## Design Philosophy: Spec Kit Ensures Proper Specifications
 
 Spec Kit (`specify` CLI) was **designed from the ground up for CLI AI tools** —
 Gemini CLI, GitHub Copilot CLI, Claude CLI, and similar. Its slash commands
-(`/speckit.constitution`, `/speckit.specify`, etc.) are prompts that only make
-sense inside a CLI tool's session. They guide the tool through a structured
-sequence of artifact creation — and the tool does all the thinking and writing.
+(`/speckit.constitution`, `/speckit.specify`, `/speckit.clarify`, `/speckit.plan`,
+`/speckit.tasks`, `/speckit.implement`) guide CLI tools through a structured
+sequence of artifact creation — specifications first, implementation last.
 
-**OpenClaw is not a Spec Kit user.** OpenClaw is the _manager_ who:
+The key insight: **Spec Kit's methodology shapes the entire process.** OpenClaw
+knows what Spec Kit needs (constitution constraints, specification scope, plan/stack
+choices, acceptance criteria) and asks the user exactly those questions during
+the REFINE phase. The result is a complete, locked specification (`locked.json`)
+that maps directly to what CLI tools will create via `/speckit.*` commands.
+
+**OpenClaw is not a Spec Kit executor.** OpenClaw is the _product owner_ who:
 - Prepares what the CLI tool needs (the task definition, `locked.json`)
 - Kicks the CLI tool off
 - Receives the results back (commits, artifacts, status)
@@ -123,7 +140,13 @@ n8n also serves as OpenClaw's **API surface for workflow management**:
 
 ---
 
-## Spec Kit Background (from github/spec-kit)
+## Spec Kit Background (from [github/spec-kit](https://github.com/github/spec-kit))
+
+Spec Kit is an **open-source toolkit** by GitHub for Spec-Driven Development.
+It flips the script on traditional development: specifications become executable,
+directly guiding implementations rather than just documenting them. The core
+philosophy is intent-driven development with multi-step refinement rather than
+one-shot code generation from prompts.
 
 ### Installation (on the build runner / VPS)
 

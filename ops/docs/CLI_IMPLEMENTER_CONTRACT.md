@@ -1,19 +1,28 @@
-# CLI Implementer Contract (Spec-Kit End-to-End Realizátor)
+# CLI Implementer Contract (Spec-Driven Development End-to-End)
 
 This document defines the system prompt and operating rules for any **CLI Implementer**
 agent (Gemini CLI, Copilot CLI, Claude CLI, etc.) invoked by the OpenClaw Dispatcher.
 
-> **Key principle:** CLI Implementer is the ONLY entity that generates Spec Kit
-> artifacts and application code. OpenClaw never does this.
+> **Key principle:** CLI Implementer is the ONLY entity that runs Spec Kit
+> `/speckit.*` commands, generates Spec Kit artifacts, and writes application code.
+> It receives a complete, locked specification from OpenClaw and executes the
+> full [Spec Kit](https://github.com/github/spec-kit) flow with correct
+> instructions from the start.
 
 ---
 
-## Why CLI Tools Are the Workers
+## Why CLI Tools Are the Builders
 
-Spec Kit was **designed specifically for CLI AI tools**. Its `/speckit.*` slash
-commands are structured prompts that guide a CLI tool through artifact creation:
-constitution → spec → plan → tasks → implementation. These commands only make
-sense inside a CLI tool's interactive session.
+[Spec Kit](https://github.com/github/spec-kit) is GitHub's toolkit for
+**spec-driven development**. Its `/speckit.*` slash commands are structured
+prompts that guide a CLI tool through artifact creation: constitution → spec →
+plan → tasks → implementation. These commands run inside a CLI tool's session
+and the tool does all the thinking and writing.
+
+The CLI tool receives a **properly prepared specification** (`locked.json`)
+from OpenClaw. Because OpenClaw already asked the user the right questions
+(mapped to Spec Kit's needs), the CLI tool has correct, complete instructions
+from the very start — no guessing, no vibe coding.
 
 **The CLI tool is the sole owner of everything that Spec Kit produces.** OpenClaw
 prepares the task (`locked.json`) and hands it off. The CLI tool:
