@@ -364,6 +364,7 @@
     },
     {
       "parameters": {
+        "propertyName": "={{ $('Classify Intent').item.json?.category || $('Classify Intent').item.json || '' }}",
         "rules": {
           "rules": [
             {
