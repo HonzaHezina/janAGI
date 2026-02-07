@@ -58,7 +58,7 @@
               "value": "={{ 'telegram:' + ($json.chat_id || 'unknown') }}"
             },
             {
-              "name": "=input",
+              "name": "input",
               "value": "={{ $json.prompt }}"
             }
           ]

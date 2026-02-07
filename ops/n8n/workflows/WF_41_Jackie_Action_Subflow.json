@@ -51,7 +51,11 @@
               "value": "={{ $('Code in JavaScript').item.json.action.payload.model }}"
             },
             {
-              "name": "=input",
+              "name": "user",
+              "value": "={{ 'telegram:' + ($json.chat_id || 'unknown') }}"
+            },
+            {
+              "name": "input",
               "value": "={{ String($('Code in JavaScript').item.json.action.payload.input ?? \"\") }}"
             }
           ]
