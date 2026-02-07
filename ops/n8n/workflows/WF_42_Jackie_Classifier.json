@@ -368,7 +368,6 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"MEETING\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "6f000344-588f-4468-8bd4-15ae7255ebcb",
       "name": "Log Category Meeting",
       "type": "n8n-nodes-base.postgres",
       "position": [
@@ -1218,17 +1217,7 @@
         ]
       ]
     },
-    "Classifier LLM": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Classify Intent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
+
     "Classify Intent": {
       "main": [
         [
