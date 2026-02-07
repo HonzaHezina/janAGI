@@ -167,8 +167,16 @@
               "description": "The user asks a general question, wants to chat, asks about previous results, wants explanation, summary, advice, opinion, plan, or asks about background task results. Mentions 'co víš o', 'vysvětli', 'shrň', 'poraď', 'jaký výsledek', 'co se zjistilo'. Default category when intent is clear but not MEETING/TASK/EMAIL."
             },
             {
+              "category": "WEB",
+              "description": "The user wants to search/browse the web, find current info, check a website, or extract info from a URL. Mentions 'vyhledej', 'najdi na internetu', 'web', 'článek', 'stránka', 'ověř', 'kolik stojí', 'aktuální'."
+            },
+            {
+              "category": "DEV",
+              "description": "The user wants software development work: create/build an app, run spec-kit, generate code, implement features, run tests, or modify a repository. Mentions 'vytvoř appku', 'spec-kit', 'scaffold', 'implementuj', 'commit', 'repo', 'build', 'testy'."
+            },
+            {
               "category": "UNKNOWN",
-              "description": "The intent is unclear or could be multiple categories. Use when not confident enough to classify into MEETING/TASK/EMAIL/CHAT."
+              "description": "The intent is unclear or could be multiple categories. Use when not confident enough to classify into MEETING/TASK/EMAIL/CHAT/WEB/DEV."
             }
           ]
         },
@@ -360,6 +368,66 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c42-if-web",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "rightValue": "WEB"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c42-if-web",
+      "name": "If category WEB",
+      "type": "n8n-nodes-base.if",
+      "position": [1040, 780],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c42-if-dev",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $('Classify Intent').item.json.categorized_to }}",
+              "rightValue": "DEV"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c42-if-dev",
+      "name": "If category DEV",
+      "type": "n8n-nodes-base.if",
+      "position": [1040, 940],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
         "workflowId": { "__rl": true, "mode": "list", "value": "" },
         "fields": {
           "values": [
@@ -447,10 +515,48 @@
         },
         "options": { "waitForSubWorkflow": true }
       },
+      "id": "c42-exec-web",
+      "name": "Execute Web WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 700],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
+      "id": "c42-exec-spec",
+      "name": "Execute SpecKit WF",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [1320, 860],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "mode": "list", "value": "" },
+        "fields": {
+          "values": [
+            { "name": "text", "stringValue": "={{ $('Classify Intent').item.json.text }}" },
+            { "name": "chat_id", "stringValue": "={{ $('Voice or Text').item.json.chat_id }}" },
+            { "name": "conversation_id", "stringValue": "={{ $('Start Run').item.json.conversation_id }}" },
+            { "name": "run_id", "stringValue": "={{ $('Start Run').item.json.run_id }}" }
+          ]
+        },
+        "options": { "waitForSubWorkflow": true }
+      },
       "id": "c42-exec-unknown",
       "name": "Execute Clarify WF",
       "type": "n8n-nodes-base.executeWorkflow",
-      "position": [1320, 700],
+      "position": [1320, 1020],
       "typeVersion": 1.2
     },
     {
@@ -635,6 +741,26 @@
           { "node": "Execute Chat WF", "type": "main", "index": 0 }
         ],
         [
+          { "node": "If category WEB", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "If category WEB": {
+      "main": [
+        [
+          { "node": "Execute Web WF", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "If category DEV", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "If category DEV": {
+      "main": [
+        [
+          { "node": "Execute SpecKit WF", "type": "main", "index": 0 }
+        ],
+        [
           { "node": "Execute Clarify WF", "type": "main", "index": 0 }
         ]
       ]
@@ -661,6 +787,20 @@
       ]
     },
     "Execute Chat WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute Web WF": {
+      "main": [
+        [
+          { "node": "Log Bot Msg", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Execute SpecKit WF": {
       "main": [
         [
           { "node": "Log Bot Msg", "type": "main", "index": 0 }

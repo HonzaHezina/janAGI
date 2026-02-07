@@ -1,0 +1,94 @@
+{
+  "name": "WF_49 Jackie SpecKit",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c49-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-400, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst text = String(trigger.text || '').trim();\n\nconst raw = text.toLowerCase();\nlet slug = raw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);\nif (!slug || slug.length < 3) {\n  slug = `app-${Date.now()}`;\n}\n\nconst body = {\n  intent: text || 'Build an app with spec-kit.',\n  app_name: trigger.app_name || slug,\n  visibility: trigger.visibility || 'private',\n  primary: trigger.primary || 'both',\n  template: trigger.template || 'fastapi'\n};\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    body\n  }\n}];\n"
+      },
+      "id": "c49-prepare",
+      "name": "Prepare SpecKit Request",
+      "type": "n8n-nodes-base.code",
+      "position": [-120, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.N8N_WEBHOOK_BASE_URL || 'http://n8n:5678'}}/webhook/janagi/spec-build",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "intent", "value": "={{ $json.body.intent }}" },
+            { "name": "app_name", "value": "={{ $json.body.app_name }}" },
+            { "name": "visibility", "value": "={{ $json.body.visibility }}" },
+            { "name": "primary", "value": "={{ $json.body.primary }}" },
+            { "name": "template", "value": "={{ $json.body.template }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c49-http",
+      "name": "Trigger SpecKit Build",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [200, 300],
+      "typeVersion": 4.3,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst responseText = typeof $json === 'string' ? $json : JSON.stringify($json);\n\nreturn [{\n  json: {\n    output: `SpecKit build triggered. ${responseText}`.slice(0, 4000),\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id\n  }\n}];\n"
+      },
+      "id": "c49-output",
+      "name": "Build Output",
+      "type": "n8n-nodes-base.code",
+      "position": [520, 300],
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Prepare SpecKit Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare SpecKit Request": {
+      "main": [
+        [
+          { "node": "Trigger SpecKit Build", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Trigger SpecKit Build": {
+      "main": [
+        [
+          { "node": "Build Output", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}

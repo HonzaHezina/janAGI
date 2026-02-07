@@ -1,0 +1,99 @@
+{
+  "name": "WF_48 Jackie Web",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c48-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [-400, 300],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst text = String(trigger.text || '').trim();\n\nconst prompt = text\n  ? `Search the web for: \"${text}\". Return top 5 results with titles and absolute URLs. If the user provided a specific URL, fetch it and return key facts.`\n  : 'Search the web for recent relevant results. Return top 5 results with titles and absolute URLs.';\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];\n"
+      },
+      "id": "c48-build",
+      "name": "Build Web Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [-120, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.OPENCLAW_BASE_URL || 'http://openclaw:18789'}}/v1/responses",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "model", "value": "={{ $json.model }}" },
+            { "name": "=input", "value": "={{ $json.prompt }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c48-http",
+      "name": "OpenClaw Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [200, 300],
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "oXGTUfvk6a176dto",
+          "name": "Bearer Auth account JH"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst content = ($json.output?.[0]?.content || []).map(c => c.text || '').join('\n');\nconst output = content || JSON.stringify($json);\n\nreturn [{\n  json: {\n    output: output.slice(0, 4000),\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id\n  }\n}];\n"
+      },
+      "id": "c48-output",
+      "name": "Build Output",
+      "type": "n8n-nodes-base.code",
+      "position": [520, 300],
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          { "node": "Build Web Prompt", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Web Prompt": {
+      "main": [
+        [
+          { "node": "OpenClaw Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenClaw Request": {
+      "main": [
+        [
+          { "node": "Build Output", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
+  },
+  "tags": []
+}
