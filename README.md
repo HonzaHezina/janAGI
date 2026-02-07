@@ -4,9 +4,11 @@
 It runs as a self-hosted stack on **Coolify** (Hostinger VPS) and acts as a personal assistant, project manager,
 and knowledge system — all accessible via **Telegram**.
 
-> **Jackie** is the AI agent (persona) that lives in n8n workflows.
-> **OpenClaw** is the LLM model powering Jackie — the brain for all AI agents in n8n,
-> plus tools for web browsing, scraping, and execution.
+> **[OpenClaw](https://docs.openclaw.ai/)** is a self-hosted AI agent gateway — it wraps
+> LLM providers (Anthropic Claude, etc.) and adds agent capabilities: tools
+> (web browsing, scraping, code execution), sessions, skills, and multi-agent routing.
+> **Jackie** is the agent persona configured in OpenClaw. n8n uses OpenClaw's
+> HTTP API (`/v1/responses`) as the brain for its AI Agent workflows.
 > All systems share the same memory (`rag.*` schema in PostgreSQL).
 
 ---
@@ -42,9 +44,9 @@ flowchart LR
     ANA[(analytics.* schema)]
   end
 
-  subgraph Agent["OpenClaw (LLM + Tools)
-  🧠 Brain + 👁️ Eyes + 🤲 Hands"]
-    LLM[🧠 AI Reasoning]
+  subgraph Agent["OpenClaw Gateway
+  🧠 AI Agent + 👁️ Eyes + 🤲 Hands"]
+    LLM[🧠 LLM + Agent Tools]
     WEB[👁️ Web Browse / Scrape]
     TOOLS[🤲 Spec Kit + GitHub + CLI]
   end
@@ -85,7 +87,7 @@ flowchart LR
 |-----------|-----------|---------|
 | Integrator | n8n (latest) | Workflow orchestration, routing, safety gates, webhook API |
 | Database | PostgreSQL 16 + pgvector 0.8.x | Vector store, audit log, knowledge base, memory |
-| LLM / AI Engine | OpenClaw | 🧠 LLM model for all AI agents in n8n, 👁️ web browsing/scraping, 🤲 project builds, workflow creation |
+| AI Agent Gateway | [OpenClaw](https://docs.openclaw.ai/) | Self-hosted agent gateway: wraps LLMs (Anthropic Claude, etc.), adds tools (👁️ web browsing/scraping, 🤲 code exec), sessions, skills |
 | Analytics | MindsDB | External BI (multi-source data), internal trends, ML scoring |
 | Chat Interface | Telegram Bot | User interaction |
 | Hosting | Coolify on Hostinger VPS | Docker stack management |

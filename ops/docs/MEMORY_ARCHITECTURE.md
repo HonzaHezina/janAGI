@@ -22,9 +22,9 @@ n8n (as the integrator) uses Postgres nodes to call stored functions:
 - `rag.search_chunks()` — Semantic search over knowledge base
 - `rag.finish_run()` — Close session (with optional summary + metadata)
 
-### From OpenClaw (LLM → via n8n Webhooks)
-OpenClaw (the LLM powering Jackie) cannot access the database directly. It uses
-HTTP webhooks provided by n8n:
+### From OpenClaw (Agent Gateway → via n8n Webhooks)
+OpenClaw (the AI agent gateway running Jackie) cannot access the database
+directly. It uses HTTP webhooks provided by n8n:
 - `POST /webhook/memory-upsert` — Store new knowledge (e.g. scraped web data, facts)
 - `POST /webhook/memory-search` — Query existing knowledge before making decisions
 
@@ -35,7 +35,7 @@ sequenceDiagram
     participant U as Telegram User
     participant N as n8n (Integrator)
     participant DB as PostgreSQL
-    participant AI as OpenClaw (LLM)
+    participant AI as OpenClaw (Agent Gateway)
 
     U->>N: Message
     N->>DB: rag.start_run_for_thread(client_id, project_id, 'telegram', chat_id, 'chat', ...)

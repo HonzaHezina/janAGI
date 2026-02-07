@@ -1,11 +1,12 @@
 # Personal Assistant + Turbo (OpenClaw)
 
-Goal: Your **main assistant** (Jackie) lives in n8n (Telegram voice/text → routing → response).
+Goal: Your **main assistant** (Jackie) lives in n8n workflows (Telegram voice/text → routing → response).
 n8n is the **integrator/curator** — it manages state, gates, and routing.
-OpenClaw is the **LLM model** powering Jackie — the brain for AI agents in n8n,
-plus tools for web browsing, scraping, and execution.
+[OpenClaw](https://docs.openclaw.ai/) is the **AI agent gateway** — it wraps
+LLMs (Anthropic Claude, etc.) and adds agent tools.
+**Jackie** is the agent persona configured in OpenClaw.
 All systems share the same memory (`rag.*` schema in PostgreSQL).
-- **🧠 Brain**: LLM model for AI agents — reasoning, decisions, conversation with memory
+- **🧠 Brain**: LLM (via OpenClaw) — reasoning, decisions, conversation with memory
 - **👁️ Eyes**: browse websites, scrape content, read social media, monitor competitors
 - **🤲 Hands**: build software projects using [Spec Kit](https://github.com/github/spec-kit) (spec-driven development — ask user what's needed, lock specs, delegate to CLI tools with correct instructions), write n8n workflows, execute approved actions
 

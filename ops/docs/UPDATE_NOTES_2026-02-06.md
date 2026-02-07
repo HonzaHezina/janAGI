@@ -140,3 +140,28 @@ Fixed the relationship between OpenClaw and Jackie across all docs:
 - `PERSONAL_ASSISTANT_TURBO.md` — Goal section description
 - `N8N_UI_OPERATOR.md` — Opening line
 - `MEMORY_ARCHITECTURE.md` — Overview (shared memory), access patterns, mermaid participant
+
+---
+
+## OpenClaw = AI Agent Gateway (2026-02-07, batch 5)
+
+Based on [OpenClaw docs](https://docs.openclaw.ai/), corrected what OpenClaw
+actually is:
+
+- **OpenClaw** = self-hosted AI agent gateway (wraps LLM providers like
+  Anthropic Claude and adds agent capabilities: tools, sessions, skills,
+  multi-agent routing)
+- **Jackie** = agent persona configured in OpenClaw (own workspace, identity,
+  session store)
+- n8n calls OpenClaw via `/v1/responses` HTTP API as the brain for its
+  AI Agent workflows
+- NOT "the LLM model" — it's a gateway layer on top of LLMs
+
+### Files Updated
+
+- `README.md` — Intro blockquote, mermaid, tech stack table
+- `ARCHITECTURE.md` — Vision, OpenClaw section, agent pattern ASCII, closing
+- `OPENCLAW_TURBO.md` — Opening paragraph
+- `PERSONAL_ASSISTANT_TURBO.md` — Goal section
+- `N8N_UI_OPERATOR.md` — Opening line
+- `MEMORY_ARCHITECTURE.md` — Access patterns, mermaid participant

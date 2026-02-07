@@ -1,7 +1,7 @@
 # OpenClaw as n8n UI Operator (robust, not fragile)
 
 You want: "Tell Jackie what to build → OpenClaw builds it → you only review the result".
-n8n routes the request (integrator), OpenClaw does the work (LLM + tools).
+n8n routes the request (integrator), OpenClaw does the work (AI agent gateway with tools).
 
 UI automation is inherently brittle if done with fixed CSS selectors or coordinates.
 This kit uses a safer pattern:

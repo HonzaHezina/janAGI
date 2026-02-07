@@ -4,12 +4,14 @@
 
 janAGI is an autonomous AI agent ecosystem where **n8n** acts as the
 **integrator and curator** — it orchestrates all processes through fixed workflows
-and uses **OpenClaw** as the **LLM model** powering its AI agents.
+and uses **[OpenClaw](https://docs.openclaw.ai/)** as the AI agent gateway.
 
-**Jackie** is the AI agent persona that lives in n8n workflows. **OpenClaw** is
-the LLM engine behind Jackie — the brain for AI agents in n8n, plus the provider
-of tools for web browsing, scraping, and execution. All systems share the same
-memory (`rag.*` schema in PostgreSQL).
+**OpenClaw** is a self-hosted gateway that wraps LLM providers (Anthropic Claude,
+etc.) and adds agent capabilities — tools (web browsing, scraping, code
+execution), sessions, skills, and multi-agent routing. **Jackie** is the agent
+persona configured in OpenClaw. n8n uses OpenClaw's HTTP API (`/v1/responses`)
+as the brain for its AI Agent workflows. All systems share the same memory
+(`rag.*` schema in PostgreSQL).
 
 OpenClaw provides:
 - **Think** — LLM reasoning, decision-making, conversation with memory
@@ -93,16 +95,18 @@ sub-workflow at the right time.
    - n8n reads `analytics.*` tables (written by MindsDB) and pushes
      reports/insights to Telegram or dashboards
 
-### OpenClaw (LLM + Tools = Brain + Hands + Eyes)
+### OpenClaw (AI Agent Gateway = Brain + Hands + Eyes)
 
-OpenClaw is the **LLM model** powering all AI agents in n8n. **Jackie** is the
-name of the main agent persona — she lives in n8n workflows and uses OpenClaw
-as her LLM backend. OpenClaw also provides built-in tools for web browsing,
-scraping, and execution.
+[OpenClaw](https://docs.openclaw.ai/) is a **self-hosted AI agent gateway**.
+It wraps LLM providers (Anthropic Claude, etc.) and adds agent capabilities:
+tools (web browsing, scraping, code execution), sessions, skills, and
+multi-agent routing. **Jackie** is the agent persona configured in OpenClaw
+(with her own workspace, identity, and session store).
 
-All systems share the same memory: the `rag.*` schema in PostgreSQL. n8n reads/writes
-it via SQL, OpenClaw accesses it via n8n webhook APIs (`/webhook/memory-upsert`,
-`/webhook/memory-search`).
+n8n uses OpenClaw's HTTP API (`/v1/responses`) as the brain for its AI Agent
+workflows. All systems share the same memory: the `rag.*` schema in PostgreSQL.
+n8n reads/writes it via SQL, OpenClaw accesses it via n8n webhook APIs
+(`/webhook/memory-upsert`, `/webhook/memory-search`).
 
 n8n calls OpenClaw whenever it needs thinking, seeing, or acting.
 
@@ -327,19 +331,19 @@ or the resource name doesn't match. Fix in Coolify → Settings → Networks.
 
 ## Agent Architecture Pattern
 
-The system follows a **"n8n integrates, OpenClaw is the LLM"** pattern.
+The system follows a **"n8n integrates, OpenClaw is the agent gateway"** pattern.
 All systems share the same memory (`rag.*` in PostgreSQL).
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │   n8n (Integrator / Curator)                            │
 │   Telegram ↔ DB logging ↔ Safety gates ↔ Routing         │
-│   AI Agent node uses OpenClaw as LLM model              │
+│   AI Agent node calls OpenClaw /v1/responses             │
 │   Decides NOTHING — routes to the right sub-workflow     │
 ├──────────────────────────────────────────────────────────┤
-│                  OpenClaw (LLM + Tools)                  │
-│             (🧠 Brain + 👁️ Eyes + 🤲 Hands)                  │
-│             Jackie = agent persona in n8n                │
+│             OpenClaw (AI Agent Gateway)                  │
+│      LLM (Anthropic Claude, etc.) + Agent Tools          │
+│             Jackie = agent persona                       │
 ├──────────────┬───────────────┬──────────────┬─────────────┤
 │ 🧠 Chat &    │ 👁️ Web        │ 🤲 Spec Kit  │ 🤲 Workflow  │
 │ Reasoning   │ Browse /     │ (Spec-     │ Builder    │
@@ -365,8 +369,8 @@ All systems share the same memory (`rag.*` in PostgreSQL).
               └──────────────────────┘
 ```
 
-OpenClaw is the **sole LLM** — either:
-- Directly in the main AI Agent node as the LLM model, or
+OpenClaw is the **sole agent gateway** — either:
+- Directly in the main AI Agent node via `/v1/responses`, or
 - As a separate sub-workflow (`WF_41`) that the main agent triggers via ACTION_DRAFT
 
 n8n **never thinks** — it only integrates, logs, gates, and routes.
