@@ -263,6 +263,31 @@
     },
     {
       "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $('Prepare Context').item.json.text }}"
+            },
+            {
+              "name": "chat_id",
+              "stringValue": "={{ $('Prepare Context').item.json.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c42-restore-context",
+      "name": "Restore User Context",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        480,
+        300
+      ],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
         "model": {
           "__rl": true,
           "mode": "id",
@@ -731,7 +756,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rag.finish_run(\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'completed',\n  NULL,\n  jsonb_build_object('category', '{{ $('Classify Intent').item.json.categorized_to || \"unknown\" }}')\n);\n",
+        "query": "SELECT rag.finish_run(\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'completed'\n);\n",
         "options": {}
       },
       "id": "c42-finish",
@@ -884,6 +909,17 @@
       ]
     },
     "Telegram Ack": {
+      "main": [
+        [
+          {
+            "node": "Restore User Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore User Context": {
       "main": [
         [
           {
