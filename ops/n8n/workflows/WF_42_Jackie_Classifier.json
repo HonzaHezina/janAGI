@@ -262,6 +262,19 @@
     },
     {
       "parameters": {
+        "functionCode": "const allowed = ['UNKNOWN','MEETING','TASK','EMAIL','CHAT','WEB','DEV'];\nconst outputs = [[],[],[],[],[],[],[]];\nfor (const item of items) {\n  let cat = null;\n  if (item.json && item.json.category) cat = String(item.json.category).toUpperCase();\n  else if (item.json && item.json.output) {\n    try { const p = JSON.parse(item.json.output); if (p && p.category) cat = String(p.category).toUpperCase(); } catch(e) {}\n    if (!cat) { const m = (item.json.output||'').match(/UNKNOWN|MEETING|TASK|EMAIL|CHAT|WEB|DEV/i); if (m) cat = m[0].toUpperCase(); }\n  } else if (item.json && item.json.text) {\n    try { const p = JSON.parse(item.json.text); if (p && p.category) cat = String(p.category).toUpperCase(); } catch(e) {}\n    if (!cat) { const m = (item.json.text||'').match(/UNKNOWN|MEETING|TASK|EMAIL|CHAT|WEB|DEV/i); if (m) cat = m[0].toUpperCase(); }\n  }\n  if (!cat) cat = 'UNKNOWN';\n  const idx = allowed.indexOf(cat);\n  const out = { json: { category: allowed[idx] || 'UNKNOWN', original: item.json } };\n  outputs[(idx>=0)?idx:0].push(out);\n}\nreturn outputs;"
+      },
+      "id": "9c1b8a2e-3f4b-4d1a-9a2b-0f7e2c9d1234",
+      "name": "Normalize Category",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        760,
+        300
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
         "fields": {
           "values": [
             {
@@ -1221,6 +1234,36 @@
       "main": [
         [
           {
+            "node": "Normalize Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    
+    "Log Category Meeting": {
+      "main": [
+        [
+          {
+            "node": "Build Meeting Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Category": {
+      "main": [
+        [
+          {
+            "node": "Log Category Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Log Category Meeting",
             "type": "main",
             "index": 0
@@ -1257,25 +1300,6 @@
         [
           {
             "node": "Log Category Dev",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Log Category Unknown",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    
-    "Log Category Meeting": {
-      "main": [
-        [
-          {
-            "node": "Build Meeting Input",
             "type": "main",
             "index": 0
           }
