@@ -1,10 +1,13 @@
 # janAGI — Autonomous Personal AI Agent
 
-**janAGI** is an autonomous AI agent ecosystem powered by **n8n**, **PostgreSQL + pgvector**, and **OpenClaw (Jackie)**.
+**janAGI** is an autonomous AI agent ecosystem powered by **n8n**, **PostgreSQL + pgvector**, and **OpenClaw**.
 It runs as a self-hosted stack on **Coolify** (Hostinger VPS) and acts as a personal assistant, project manager,
 and knowledge system — all accessible via **Telegram**.
 
-> The name "Jackie" is the AI persona. OpenClaw is the execution engine. n8n is the brain.
+> **Jackie** is the AI agent (persona) that lives in n8n workflows.
+> **OpenClaw** is the LLM model powering Jackie — the brain for all AI agents in n8n,
+> plus tools for web browsing, scraping, and execution.
+> All systems share the same memory (`rag.*` schema in PostgreSQL).
 
 ---
 
@@ -39,7 +42,7 @@ flowchart LR
     ANA[(analytics.* schema)]
   end
 
-  subgraph Agent["OpenClaw / Jackie
+  subgraph Agent["OpenClaw (LLM + Tools)
   🧠 Brain + 👁️ Eyes + 🤲 Hands"]
     LLM[🧠 AI Reasoning]
     WEB[👁️ Web Browse / Scrape]
@@ -82,7 +85,7 @@ flowchart LR
 |-----------|-----------|---------|
 | Integrator | n8n (latest) | Workflow orchestration, routing, safety gates, webhook API |
 | Database | PostgreSQL 16 + pgvector 0.8.x | Vector store, audit log, knowledge base, memory |
-| AI Agent | OpenClaw / Jackie | 🧠 Reasoning, 👁️ web browsing/scraping, 🤲 project builds, workflow creation |
+| LLM / AI Engine | OpenClaw | 🧠 LLM model for all AI agents in n8n, 👁️ web browsing/scraping, 🤲 project builds, workflow creation |
 | Analytics | MindsDB | External BI (multi-source data), internal trends, ML scoring |
 | Chat Interface | Telegram Bot | User interaction |
 | Hosting | Coolify on Hostinger VPS | Docker stack management |

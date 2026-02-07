@@ -1,7 +1,9 @@
 # OpenClaw Turbo (HTTP) for n8n
 
-OpenClaw is the system’s **brain, hands, and eyes** — n8n (integrator) calls it
-via HTTP whenever it needs thinking, web browsing, scraping, or execution.
+OpenClaw is the **LLM model** powering all AI agents in n8n (Jackie is the main
+agent persona). It serves as the brain (🧠 LLM reasoning), eyes (👁️ web browsing,
+scraping), and hands (🤲 execution). n8n (integrator) calls it via HTTP.
+All systems share the same memory (`rag.*` schema in PostgreSQL).
 
 OpenClaw Gateway exposes 3 HTTP surfaces:
 

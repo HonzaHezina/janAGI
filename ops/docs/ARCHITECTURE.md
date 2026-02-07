@@ -4,9 +4,14 @@
 
 janAGI is an autonomous AI agent ecosystem where **n8n** acts as the
 **integrator and curator** — it orchestrates all processes through fixed workflows
-and calls **OpenClaw (Jackie)** as its **brain, hands, and eyes**.
+and uses **OpenClaw** as the **LLM model** powering its AI agents.
 
-Jackie (via OpenClaw) can:
+**Jackie** is the AI agent persona that lives in n8n workflows. **OpenClaw** is
+the LLM engine behind Jackie — the brain for AI agents in n8n, plus the provider
+of tools for web browsing, scraping, and execution. All systems share the same
+memory (`rag.*` schema in PostgreSQL).
+
+OpenClaw provides:
 - **Think** — LLM reasoning, decision-making, conversation with memory
 - **See** — browse websites, read social media, scrape content
 - **Act** — build software projects using [Spec Kit](https://github.com/github/spec-kit)
@@ -88,9 +93,17 @@ sub-workflow at the right time.
    - n8n reads `analytics.*` tables (written by MindsDB) and pushes
      reports/insights to Telegram or dashboards
 
-### OpenClaw / Jackie (Brain + Hands + Eyes)
+### OpenClaw (LLM + Tools = Brain + Hands + Eyes)
 
-OpenClaw is the **AI agent** — the system's intelligence and execution capability.
+OpenClaw is the **LLM model** powering all AI agents in n8n. **Jackie** is the
+name of the main agent persona — she lives in n8n workflows and uses OpenClaw
+as her LLM backend. OpenClaw also provides built-in tools for web browsing,
+scraping, and execution.
+
+All systems share the same memory: the `rag.*` schema in PostgreSQL. n8n reads/writes
+it via SQL, OpenClaw accesses it via n8n webhook APIs (`/webhook/memory-upsert`,
+`/webhook/memory-search`).
+
 n8n calls OpenClaw whenever it needs thinking, seeing, or acting.
 
 **🧠 Brain (Reasoning):**
@@ -314,17 +327,19 @@ or the resource name doesn't match. Fix in Coolify → Settings → Networks.
 
 ## Agent Architecture Pattern
 
-The system follows a **"n8n integrates, OpenClaw thinks and acts"** pattern:
+The system follows a **"n8n integrates, OpenClaw is the LLM"** pattern.
+All systems share the same memory (`rag.*` in PostgreSQL).
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │   n8n (Integrator / Curator)                            │
 │   Telegram ↔ DB logging ↔ Safety gates ↔ Routing         │
-│                                                          │
+│   AI Agent node uses OpenClaw as LLM model              │
 │   Decides NOTHING — routes to the right sub-workflow     │
 ├──────────────────────────────────────────────────────────┤
-│                  OpenClaw / Jackie                       │
+│                  OpenClaw (LLM + Tools)                  │
 │             (🧠 Brain + 👁️ Eyes + 🤲 Hands)                  │
+│             Jackie = agent persona in n8n                │
 ├──────────────┬───────────────┬──────────────┬─────────────┤
 │ 🧠 Chat &    │ 👁️ Web        │ 🤲 Spec Kit  │ 🤲 Workflow  │
 │ Reasoning   │ Browse /     │ (Spec-     │ Builder    │
@@ -350,8 +365,9 @@ The system follows a **"n8n integrates, OpenClaw thinks and acts"** pattern:
               └──────────────────────┘
 ```
 
-OpenClaw is the **sole intelligence** — either:
-- Directly in the main agent as an HTTP tool call, or
+OpenClaw is the **sole LLM** — either:
+- Directly in the main AI Agent node as the LLM model, or
 - As a separate sub-workflow (`WF_41`) that the main agent triggers via ACTION_DRAFT
 
 n8n **never thinks** — it only integrates, logs, gates, and routes.
+All systems share the same memory (`rag.*` schema in PostgreSQL).

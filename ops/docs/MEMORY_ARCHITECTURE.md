@@ -4,6 +4,8 @@
 
 janAGI uses a **unified memory system** built on PostgreSQL + pgvector.
 All data flows through the `rag.*` schema — there is no separate `chat.*` schema.
+**All systems share this memory**: n8n reads/writes via SQL, OpenClaw accesses
+it via n8n webhook APIs, MindsDB reads it for analytics.
 
 - **Short-term memory**: `rag.events` (append-only message log per conversation)
 - **Long-term memory**: `rag.chunks` (embedded text for semantic search)
@@ -20,9 +22,9 @@ n8n (as the integrator) uses Postgres nodes to call stored functions:
 - `rag.search_chunks()` — Semantic search over knowledge base
 - `rag.finish_run()` — Close session (with optional summary + metadata)
 
-### From OpenClaw (Brain → via n8n Webhooks)
-OpenClaw (the brain) cannot access the database directly. It uses HTTP webhooks
-provided by n8n:
+### From OpenClaw (LLM → via n8n Webhooks)
+OpenClaw (the LLM powering Jackie) cannot access the database directly. It uses
+HTTP webhooks provided by n8n:
 - `POST /webhook/memory-upsert` — Store new knowledge (e.g. scraped web data, facts)
 - `POST /webhook/memory-search` — Query existing knowledge before making decisions
 
@@ -33,7 +35,7 @@ sequenceDiagram
     participant U as Telegram User
     participant N as n8n (Integrator)
     participant DB as PostgreSQL
-    participant AI as OpenClaw/Jackie (Brain)
+    participant AI as OpenClaw (LLM)
 
     U->>N: Message
     N->>DB: rag.start_run_for_thread(client_id, project_id, 'telegram', chat_id, 'chat', ...)

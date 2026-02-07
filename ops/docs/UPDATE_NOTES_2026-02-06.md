@@ -122,3 +122,21 @@ Corrected Spec Kit descriptions across all docs. Previously described as
 - `CLI_IMPLEMENTER_CONTRACT.md` — Title, key principle, "Why CLI Tools" section rewritten
 - `PERSONAL_ASSISTANT_TURBO.md` — Hands description and router updated
 - `WORKFLOWS.md` — Related docs link text updated
+
+---
+
+## OpenClaw/Jackie Relationship Fix (2026-02-07, batch 4)
+
+Fixed the relationship between OpenClaw and Jackie across all docs:
+- **OpenClaw** = LLM model powering AI agents in n8n (brain + tools for web/scraping/execution)
+- **Jackie** = AI agent persona that lives in n8n workflows, uses OpenClaw as its LLM
+- **Shared memory**: all systems (n8n, OpenClaw, MindsDB) share the same `rag.*` schema
+
+### Files Updated
+
+- `README.md` — Intro, blockquote, mermaid diagram, tech stack table
+- `ARCHITECTURE.md` — Vision, OpenClaw section, agent pattern ASCII art, closing
+- `OPENCLAW_TURBO.md` — Opening paragraph
+- `PERSONAL_ASSISTANT_TURBO.md` — Goal section description
+- `N8N_UI_OPERATOR.md` — Opening line
+- `MEMORY_ARCHITECTURE.md` — Overview (shared memory), access patterns, mermaid participant
