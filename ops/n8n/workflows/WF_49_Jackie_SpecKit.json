@@ -11,7 +11,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst text = String(trigger.text || '').trim();\n\nconst raw = text.toLowerCase();\nlet slug = raw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);\nif (!slug || slug.length < 3) {\n  slug = `app-${Date.now()}`;\n}\n\nconst body = {\n  intent: text || 'Build an app with spec-kit.',\n  app_name: trigger.app_name || slug,\n  visibility: trigger.visibility || 'private',\n  primary: trigger.primary || 'both',\n  template: trigger.template || 'fastapi'\n};\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    body\n  }\n}];\n"
+        "jsCode": "const trigger = $input.first() ? $input.first().json : {};\nconst text = String(trigger.text || '').trim();\n\nconst raw = text.toLowerCase();\nlet slug = raw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);\nif (!slug || slug.length < 3) {\n  slug = `app-${Date.now()}`;\n}\n\nconst body = {\n  intent: text || 'Build an app with spec-kit.',\n  app_name: trigger.app_name || slug,\n  visibility: trigger.visibility || 'private',\n  primary: trigger.primary || 'both',\n  template: trigger.template || 'fastapi'\n};\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    body\n  }\n}];\n"
       },
       "id": "c49-prepare",
       "name": "Prepare SpecKit Request",

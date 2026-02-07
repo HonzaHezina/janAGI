@@ -196,7 +196,9 @@
           "value": "mistral/mistral-large-latest"
         },
         "responsesApiEnabled": false,
-        "options": {}
+        "options": {
+          "temperature": 0
+        }
       },
       "id": "c42-llm-classifier",
       "name": "Classifier LLM",

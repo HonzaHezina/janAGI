@@ -11,7 +11,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const trigger = $('Execute Workflow Trigger').first().json;\nconst text = String(trigger.text || '').trim();\n\nconst prompt = text\n  ? `Search the web for: \"${text}\". Return top 5 results with titles and absolute URLs. If the user provided a specific URL, fetch it and return key facts.`\n  : 'Search the web for recent relevant results. Return top 5 results with titles and absolute URLs.';\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];\n"
+        "jsCode": "const trigger = $input.first() ? $input.first().json : {};\nconst text = String(trigger.text || '').trim();\n\nconst prompt = text\n  ? `Search the web for: \"${text}\". Return top 5 results with titles and absolute URLs. If the user provided a specific URL, fetch it and return key facts.`\n  : 'Search the web for recent relevant results. Return top 5 results with titles and absolute URLs.';\n\nreturn [{\n  json: {\n    chat_id: trigger.chat_id,\n    conversation_id: trigger.conversation_id,\n    run_id: trigger.run_id,\n    prompt,\n    model: trigger.model || 'openclaw:main'\n  }\n}];\n"
       },
       "id": "c48-build",
       "name": "Build Web Prompt",
