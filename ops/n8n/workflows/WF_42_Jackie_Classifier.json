@@ -8,7 +8,7 @@
         ],
         "additionalFields": {}
       },
-      "id": "c42-trigger",
+      "id": "c9241777-c942-4f51-b5b0-191911480aac",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "position": [
@@ -44,7 +44,7 @@
         },
         "options": {}
       },
-      "id": "c42-voicetext",
+      "id": "5b57810d-0f93-4909-8385-12c8d6791503",
       "name": "Voice or Text",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -64,7 +64,7 @@
           },
           "conditions": [
             {
-              "id": "c42-if-empty",
+              "id": "bfbb1837-541d-41e4-91ee-43e743cf4874",
               "operator": {
                 "type": "string",
                 "operation": "empty",
@@ -78,7 +78,7 @@
         },
         "options": {}
       },
-      "id": "c42-if",
+      "id": "9442618c-48cf-448f-b2fd-b44615b2b985",
       "name": "If text empty",
       "type": "n8n-nodes-base.if",
       "position": [
@@ -93,7 +93,7 @@
         "fileId": "={{ $('Telegram Trigger').item.json.message.voice.file_id }}",
         "additionalFields": {}
       },
-      "id": "c42-getvoice",
+      "id": "22166c2e-4bf5-41dd-a7f3-186af0836137",
       "name": "Get Voice File",
       "type": "n8n-nodes-base.telegram",
       "position": [
@@ -121,7 +121,7 @@
         "inputType": "binary",
         "options": {}
       },
-      "id": "c42-transcribe",
+      "id": "2524c72a-96a9-4d8e-b9ac-05b1b5bf72bf",
       "name": "Transcribe",
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "position": [
@@ -156,7 +156,7 @@
         },
         "options": {}
       },
-      "id": "c42-context",
+      "id": "4e4277fd-5081-42b1-9260-76d1ba803775",
       "name": "Prepare Context",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -185,7 +185,7 @@
         },
         "options": {}
       },
-      "id": "c42-mergefields",
+      "id": "afb26988-ca1d-44d6-aa0b-35bac6312ff4",
       "name": "Set transcribed text",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -200,7 +200,7 @@
         "query": "SELECT * FROM rag.start_run_for_thread(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  'telegram',\n  '{{ $json.chat_id }}'::text,\n  'classifier',\n  ('Classifier ' || '{{ $json.chat_id }}')::text,\n  '{}'::jsonb,\n  '{}'::jsonb\n);\n",
         "options": {}
       },
-      "id": "c42-startrun",
+      "id": "043b4ff0-02f2-45b4-8f5c-0d0b499ac312",
       "name": "Start Run",
       "type": "n8n-nodes-base.postgres",
       "position": [
@@ -221,7 +221,7 @@
         "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $json.conversation_id }}'::uuid,\n  '{{ $json.run_id }}'::uuid,\n  'user',\n  '{{ $('Prepare Context').item.json.user_id }}'::text,\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'user',\n    'text', to_jsonb('{{ $('Prepare Context').item.json.text }}'::text),\n    'channel', 'telegram',\n    'category', 'pending'\n  )\n) AS event_id;\n",
         "options": {}
       },
-      "id": "c42-loguser",
+      "id": "6314cf7c-0995-4249-9645-660ea8f5f154",
       "name": "Log User Msg",
       "type": "n8n-nodes-base.postgres",
       "position": [
@@ -244,7 +244,7 @@
           "appendAttribution": false
         }
       },
-      "id": "c42-ack",
+      "id": "b2cf1eab-8edb-4b26-a4d5-358c90dcb561",
       "name": "Telegram Ack",
       "type": "n8n-nodes-base.telegram",
       "position": [
@@ -277,7 +277,7 @@
         },
         "options": {}
       },
-      "id": "c42-restore-context",
+      "id": "8401f255-026c-455c-8318-add1c83f2693",
       "name": "Restore User Context",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -298,7 +298,7 @@
           "temperature": 0
         }
       },
-      "id": "c42-llm-classifier",
+      "id": "eb0a2be6-1296-431f-81f4-04a910b0c9f0",
       "name": "Classifier LLM",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "position": [
@@ -352,7 +352,7 @@
           "systemPromptTemplate": "You are the Intent Classification Dispatcher for the Jackie AI system.\nYour goal is to route the user's message to the most appropriate specialized workflow.\n\nAnalyze the Input Text and select the best matching category from: {categories}\n\nRouting Guidelines:\n- 'WEB': Select this if the user asks for current news, facts, stock prices, or to search/browse the internet.\n- 'EMAIL': Select this for reading, searching, or sending emails.\n- 'DEV': Select this for programming, code generation, git, or technical tasks.\n- 'MEETING': Select this for calendar events and scheduling.\n- 'TASK': Select this for reminders and todo lists.\n- 'CHAT': Select this for general conversation, analysis, or questions NOT requiring external tools/web/email.\n\nOutput strictly JSON matching the required schema."
         }
       },
-      "id": "c42-classifier",
+      "id": "7998b0b2-9c99-41d2-8047-a999c9d55c16",
       "name": "Classify Intent",
       "type": "@n8n/n8n-nodes-langchain.textClassifier",
       "position": [
@@ -367,12 +367,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"MEETING\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-meeting",
+      "id": "6f000344-588f-4468-8bd4-15ae7255ebcb",
       "name": "Log Category Meeting",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 60],
+      "position": [
+        900,
+        60
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -380,12 +388,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"TASK\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-task",
+      "id": "aa366989-adef-4658-9fb7-d6e8e1a36dc7",
       "name": "Log Category Task",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 220],
+      "position": [
+        900,
+        220
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -393,12 +409,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"EMAIL\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-email",
+      "id": "221cb459-f0c3-4158-ab33-b2bff391a254",
       "name": "Log Category Email",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 380],
+      "position": [
+        900,
+        380
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -406,12 +430,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"CHAT\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-chat",
+      "id": "671347ef-dce7-4e20-98f5-d80442f8da4e",
       "name": "Log Category Chat",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 540],
+      "position": [
+        900,
+        540
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -419,12 +451,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"WEB\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-web",
+      "id": "8f868be3-1af3-452c-a3cd-efe9c6606676",
       "name": "Log Category Web",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 700],
+      "position": [
+        900,
+        700
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -432,12 +472,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"DEV\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-dev",
+      "id": "9f84bb8a-b755-436d-976d-bd32ff8a3932",
       "name": "Log Category Dev",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 860],
+      "position": [
+        900,
+        860
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -445,12 +493,20 @@
         "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"UNKNOWN\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
         "options": {}
       },
-      "id": "c42-log-unknown",
+      "id": "9bef1b83-3c88-4436-bebc-c611c0ed1eaf",
       "name": "Log Category Unknown",
       "type": "n8n-nodes-base.postgres",
-      "position": [900, 1020],
+      "position": [
+        900,
+        1020
+      ],
       "typeVersion": 2.6,
-      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+      "credentials": {
+        "postgres": {
+          "id": "Y1VwNrsd2m68uUCQ",
+          "name": "Postgres account JH"
+        }
+      }
     },
     {
       "parameters": {
@@ -476,7 +532,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-meeting",
+      "id": "ebb344c0-1be3-4b4a-a57e-df00cfefff14",
       "name": "Build Meeting Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -509,7 +565,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-task",
+      "id": "2508371a-6e32-4d0f-b8f6-8aa6cdf874dd",
       "name": "Build Task Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -542,7 +598,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-email",
+      "id": "dcd5e0a8-3ecb-4b38-8334-598615be3d31",
       "name": "Build Email Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -575,7 +631,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-chat",
+      "id": "2fa7c511-d129-4d5c-ae53-f3609f8ebbd8",
       "name": "Build Chat Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -608,7 +664,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-web",
+      "id": "537d7772-3afa-4585-ac6a-652405a5cf2c",
       "name": "Build Web Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -641,7 +697,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-dev",
+      "id": "70cb9182-e1a1-46af-8872-39d2c032e4d5",
       "name": "Build Dev Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -674,7 +730,7 @@
         },
         "options": {}
       },
-      "id": "c42-payload-unknown",
+      "id": "276d12ac-e82c-491f-a737-2c9054dd8e47",
       "name": "Build Unknown Input",
       "type": "n8n-nodes-base.set",
       "position": [
@@ -684,7 +740,7 @@
       "typeVersion": 3.2
     },
     {
-      "id": "c42-exec-meeting",
+      "id": "d4aba2b4-02b6-4b0a-b4f3-dcfc8742ef11",
       "name": "Execute Meeting WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -724,7 +780,7 @@
       }
     },
     {
-      "id": "c42-exec-task",
+      "id": "5e771fea-1879-4922-968d-fa648b5577b1",
       "name": "Execute Task WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -764,7 +820,7 @@
       }
     },
     {
-      "id": "c42-exec-email",
+      "id": "c58f5438-d137-4c24-b19b-47be05370c3e",
       "name": "Execute Email WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -804,7 +860,7 @@
       }
     },
     {
-      "id": "c42-exec-chat",
+      "id": "336af132-d757-4973-98fb-06acd5026670",
       "name": "Execute Chat WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -844,7 +900,7 @@
       }
     },
     {
-      "id": "c42-exec-web",
+      "id": "01043bdf-b43c-4b6e-af3f-ace780cab1a6",
       "name": "Execute Web WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -884,7 +940,7 @@
       }
     },
     {
-      "id": "c42-exec-spec",
+      "id": "d9d460c5-2b22-40d2-885b-6731d89b33cb",
       "name": "Execute SpecKit WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -924,7 +980,7 @@
       }
     },
     {
-      "id": "c42-exec-unknown",
+      "id": "b7743993-173b-4587-829f-f1b9c5425c08",
       "name": "Execute Clarify WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
@@ -969,7 +1025,7 @@
         "query": "SELECT rag.log_event(\n  '781594f6-132b-4d47-9933-6499223dbd56'::uuid,\n  '56c83308-384e-4e27-8893-2aa46b845851'::uuid,\n  '{{ $('Start Run').item.json.conversation_id }}'::uuid,\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'n8n',\n  'ai_jackie',\n  'message',\n  NULL,\n  jsonb_build_object(\n    'role', 'assistant',\n    'text', to_jsonb('{{ (\n  $('Execute Web WF').first()?.json?.output ||\n  $('Execute Meeting WF').first()?.json?.output ||\n  $('Execute Task WF').first()?.json?.output ||\n  $('Execute Email WF').first()?.json?.output ||\n  $('Execute Chat WF').first()?.json?.output ||\n  $('Execute SpecKit WF').first()?.json?.output ||\n  $('Execute Clarify WF').first()?.json?.output ||\n  \"\"\n).toString().replace(/'/g, \"''\") }}'::text),\n    'channel', 'telegram'\n  )\n) AS event_id;\n",
         "options": {}
       },
-      "id": "c42-logbot",
+      "id": "5d99068c-9eed-4053-b71b-7e285ee08542",
       "name": "Log Bot Msg",
       "type": "n8n-nodes-base.postgres",
       "position": [
@@ -990,7 +1046,7 @@
         "query": "SELECT rag.finish_run(\n  '{{ $('Start Run').item.json.run_id }}'::uuid,\n  'completed'\n);\n",
         "options": {}
       },
-      "id": "c42-finish",
+      "id": "8b910765-f9d2-499f-b7f3-6db189522580",
       "name": "Finish Run",
       "type": "n8n-nodes-base.postgres",
       "position": [
@@ -1014,7 +1070,7 @@
           "parse_mode": "Markdown"
         }
       },
-      "id": "c42-reply",
+      "id": "ca722f2a-f1e1-4ab0-a747-856bca0ef996",
       "name": "Telegram Reply",
       "type": "n8n-nodes-base.telegram",
       "position": [
