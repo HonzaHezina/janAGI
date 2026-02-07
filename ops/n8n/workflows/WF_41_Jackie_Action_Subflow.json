@@ -48,7 +48,7 @@
           "parameters": [
             {
               "name": "model",
-              "value": "={{ $('Code in JavaScript').item.json.action.payload.model }}"
+              "value": "={{ $('Code in JavaScript').item.json.action?.payload?.model || 'openclaw:main' }}"
             },
             {
               "name": "user",
@@ -56,7 +56,7 @@
             },
             {
               "name": "input",
-              "value": "={{ String($('Code in JavaScript').item.json.action.payload.input ?? \"\") }}"
+              "value": "={{ String($('Code in JavaScript').item.json.action?.payload?.input ?? '') }}"
             }
           ]
         },
@@ -80,7 +80,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const text = ($json.draft_text || \"\").trim();\n\n// Najdi řádek s JSONem (typicky druhý řádek)\nconst lines = text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean);\n\n// Najdi první řádek, který vypadá jako JSON objekt\nconst jsonLine = lines.find(l => l.startsWith(\"{\") && l.endsWith(\"}\"));\nif (!jsonLine) {\n  throw new Error(\"No JSON line found in draft_text. Expected [ACTION_DRAFT] + JSON.\");\n}\n\nlet action;\ntry {\n  action = JSON.parse(jsonLine);\n} catch (e) {\n  throw new Error(\"Failed to parse ACTION JSON: \" + e.message);\n}\n\nreturn [{\n  json: {\n    ...$json,\n    action\n  }\n}];\n"
+        "jsCode": "const text = ($json.draft_text || \"\").toString();\n\n// Prefer Telegram-safe wrapper markers (see ops/docs/ACTION_DRAFT_PROTOCOL.md)\nconst markerPairs = [\n  { A: '---PAYLOAD_JSON---', B: '---END_PAYLOAD_JSON---' },\n  { A: '---PAYLOADJSON---', B: '---ENDPAYLOADJSON---' },\n  { A: '---PAYLOAD_JSON---', B: '---ENDPAYLOADJSON---' },\n  { A: '---PAYLOADJSON---', B: '---END_PAYLOAD_JSON---' },\n];\n\nlet raw = null;\nfor (const { A, B } of markerPairs) {\n  const a = text.indexOf(A);\n  const b = text.indexOf(B);\n  if (a !== -1 && b !== -1 && b > a) {\n    raw = text.slice(a + A.length, b).trim();\n    break;\n  }\n}\n\n// Fallback: extract first JSON object by brace range\nif (!raw) {\n  const start = text.indexOf('{');\n  const end = text.lastIndexOf('}');\n  if (start !== -1 && end !== -1 && end > start) {\n    raw = text.slice(start, end + 1).trim();\n  }\n}\n\nif (!raw) {\n  throw new Error('No payload JSON found in draft_text.');\n}\n\nlet action;\ntry {\n  action = JSON.parse(raw);\n} catch (e) {\n  throw new Error('Failed to parse payload JSON: ' + e.message);\n}\n\nreturn [{\n  json: {\n    ...$json,\n    action,\n    action_raw: raw\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
