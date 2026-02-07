@@ -4,8 +4,8 @@
 It wraps LLM providers (Anthropic Claude, etc.) and adds agent capabilities:
 tools (web browsing, scraping, code execution), sessions, skills, and
 multi-agent routing. **Jackie** is the agent persona configured in OpenClaw.
-n8n (integrator) calls OpenClaw via HTTP. All systems share the same memory
-(`rag.*` schema in PostgreSQL).
+n8n (fair-code workflow automation platform with AI capabilities) calls OpenClaw
+via HTTP. All systems share the same memory (`rag.*` schema in PostgreSQL).
 
 OpenClaw Gateway exposes 3 HTTP surfaces:
 

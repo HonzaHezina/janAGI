@@ -1,7 +1,7 @@
 # Personal Assistant + Turbo (OpenClaw)
 
 Goal: Your **main assistant** (Jackie) lives in n8n workflows (Telegram voice/text → routing → response).
-n8n is the **integrator/curator** — it manages state, gates, and routing.
+n8n is the **integrator/curator** — a [fair-code workflow automation platform](https://github.com/n8n-io/n8n)\nwith native AI capabilities (LangChain-based AI agents, 400+ integrations).\nIt manages state, gates, and routing.
 [OpenClaw](https://docs.openclaw.ai/) is the **AI agent gateway** — it wraps
 LLMs (Anthropic Claude, etc.) and adds agent tools.
 **Jackie** is the agent persona configured in OpenClaw.

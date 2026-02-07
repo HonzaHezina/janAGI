@@ -108,7 +108,9 @@ Resolves project by `project_key`. Returns rows above `threshold`, limited to `c
 
 ## Schema: `analytics.*`
 
-Written by MindsDB batch jobs (read-only from n8n). See [`030_analytics.sql`](../infra/postgres/init/030_analytics.sql).
+Written by MindsDB scheduled jobs (read-only from n8n). MindsDB connects to
+Postgres as a federated data source and writes results here.
+See [`030_analytics.sql`](../infra/postgres/init/030_analytics.sql).
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
@@ -122,12 +124,12 @@ Written by MindsDB batch jobs (read-only from n8n). See [`030_analytics.sql`](..
 | `idx_lead_scores_client` | `analytics.lead_scores` | `(client_id, score DESC)` |
 | `idx_trends_daily_client` | `analytics.trends_daily` | `(client_id, day DESC)` |
 
-### MindsDB Role
+### MindsDB Role (Federated Query Engine)
 
 ```sql
 ROLE mindsdb_ro  -- LOGIN, password in env var MINDSDB_PG_PASSWORD
-  GRANT SELECT ON rag.*        -- read-only access to source data
-  GRANT ALL ON analytics.*     -- write access for batch results
+  GRANT SELECT ON rag.*        -- read access as federated data source
+  GRANT ALL ON analytics.*     -- write access for computed results
 ```
 
 ---

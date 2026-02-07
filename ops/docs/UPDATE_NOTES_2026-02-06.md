@@ -165,3 +165,34 @@ actually is:
 - `PERSONAL_ASSISTANT_TURBO.md` — Goal section
 - `N8N_UI_OPERATOR.md` — Opening line
 - `MEMORY_ARCHITECTURE.md` — Access patterns, mermaid participant
+
+---
+
+## Batch 6 — n8n & MindsDB Identity Fix (per GitHub repos)
+
+### Problem
+- **n8n** was described generically as "workflow orchestration, routing".
+  Actually: fair-code workflow automation platform with native AI capabilities
+  (LangChain-based AI agents, 400+ integrations, JS/Python code support).
+- **MindsDB** was described as "Analytics Dept." / "ML Models / Batch Jobs".
+  Actually: Federated Query Engine for AI — connects hundreds of data sources,
+  unifies them via knowledge bases and views (no-ETL), responds via built-in
+  agents and MCP server. Tagline: "The only MCP Server you'll ever need."
+
+### Key Corrections
+- **n8n**: Added fair-code license, native AI capabilities (LangChain), 400+
+  integrations, JS/Python code support to all descriptions. Role as
+  "integrator/curator" in janAGI preserved (that's our usage).
+- **MindsDB**: "Analytics Dept." → "Federated Query Engine for AI".
+  Core philosophy: Connect → Unify → Respond. Built-in MCP server + agents.
+  In janAGI: data federation + analytics (not just batch ML jobs).
+
+### Files Updated
+- `README.md` — Tech stack, mermaid diagram, roadmap
+- `ARCHITECTURE.md` — Vision, n8n section, MindsDB section, ASCII art, sequence diagram
+- `MINDSDB_ANALYTICS.md` — Title, opening, core capabilities, data pipeline
+- `OPENCLAW_TURBO.md` — n8n reference
+- `PERSONAL_ASSISTANT_TURBO.md` — n8n description
+- `MEMORY_ARCHITECTURE.md` — MindsDB access pattern
+- `DB_SCHEMA.md` — MindsDB role description
+- `WORKFLOWS.md` — MindsDB doc link

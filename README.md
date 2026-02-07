@@ -31,7 +31,7 @@ flowchart LR
     TG[Telegram]
   end
 
-  subgraph Integrator["n8n (Integrator / Curator)"]
+  subgraph Integrator["n8n (Fair-code Workflow Automation + AI Agents)"]
     CHAT[Chat Flow - WF_40]
     ACTION[Action Subflow - WF_41]
     SPEC[Spec-Kit Flow]
@@ -51,8 +51,8 @@ flowchart LR
     TOOLS[🤲 Spec Kit + GitHub + CLI]
   end
 
-  subgraph Analytics["MindsDB (Analytics Dept.)"]
-    ML[ML Models / Batch Jobs]
+  subgraph DataFed["MindsDB (Federated AI Query Engine)"]
+    ML[Connect / Unify / Respond]
   end
 
   TG -->|Message| CHAT
@@ -85,10 +85,10 @@ flowchart LR
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Integrator | n8n (latest) | Workflow orchestration, routing, safety gates, webhook API |
+| Workflow Automation | [n8n](https://github.com/n8n-io/n8n) (latest) | Fair-code workflow automation platform with native AI capabilities (LangChain-based AI agents), 400+ integrations, JS/Python code support — acts as integrator/curator in janAGI |
 | Database | PostgreSQL 16 + pgvector 0.8.x | Vector store, audit log, knowledge base, memory |
 | AI Agent Gateway | [OpenClaw](https://docs.openclaw.ai/) | Self-hosted agent gateway: wraps LLMs (Anthropic Claude, etc.), adds tools (👁️ web browsing/scraping, 🤲 code exec), sessions, skills |
-| Analytics | MindsDB | External BI (multi-source data), internal trends, ML scoring |
+| Data Federation | [MindsDB](https://github.com/mindsdb/mindsdb) | Federated Query Engine for AI — connects hundreds of data sources, unifies them (knowledge bases, views, jobs), responds via built-in agents & MCP server. In janAGI: data federation + analytics |
 | Chat Interface | Telegram Bot | User interaction |
 | Hosting | Coolify on Hostinger VPS | Docker stack management |
 | Embeddings | OpenAI text-embedding-3-small (1536d) | Semantic search |
@@ -106,8 +106,8 @@ All business data lives in the `janagi` Postgres database with the `rag` schema:
 - **`rag.events`** — Append-only audit log (`actor_type`, `actor_name`, `event_type`, `name`, `payload` jsonb, `ts`)
 - **`rag.artifacts`** — Generated outputs (`kind`, `title`, `content_text`, `metadata`)
 - **`rag.sources`** → **`rag.documents`** → **`rag.chunks`** — RAG pipeline (source → document → embedded chunks)
-- **`analytics.trends_daily`** — Daily topic/keyword aggregation (MindsDB)
-- **`analytics.lead_scores`** — ML-scored leads (MindsDB)
+- **`analytics.trends_daily`** — Daily topic/keyword aggregation (MindsDB jobs)
+- **`analytics.lead_scores`** — ML-scored leads (MindsDB models)
 
 Helper functions: `rag.start_run_for_thread()`, `rag.log_event()` (9-arg), `rag.finish_run()`, `rag.search_chunks()`.
 
@@ -249,10 +249,10 @@ janAGI/
 - [x] Action subflow with approval gate (WF_41)
 - [x] Spec-Kit spec-driven development contract + CLI implementer contract
 - [x] n8n Workflow Builder (API-first)
-- [x] MindsDB integration (analytics schema + batch jobs)
+- [x] MindsDB integration (federated query engine + analytics schema)
 - [ ] Live Telegram bot deployment on Coolify
 - [ ] Document ingestion pipeline (URLs, PDFs)
 - [ ] Spec-Kit full autopilot (end-to-end spec-driven parallel builds)
 - [ ] Web scraping data pipelines (social media, competitors)
-- [ ] MindsDB external analytics (multi-source BI dashboards)
+- [ ] MindsDB data federation (Connect → Unify → Respond across external sources)
 - [ ] Dashboard UI (bolt.diy or custom)

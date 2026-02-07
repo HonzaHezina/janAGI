@@ -2,8 +2,10 @@
 
 ## Vision
 
-janAGI is an autonomous AI agent ecosystem where **n8n** acts as the
-**integrator and curator** — it orchestrates all processes through fixed workflows
+janAGI is an autonomous AI agent ecosystem where **[n8n](https://github.com/n8n-io/n8n)** acts as the
+**integrator and curator** — it’s a fair-code workflow automation platform
+with native AI capabilities (LangChain-based AI agents, 400+ integrations,
+JS/Python code support) that orchestrates all processes through fixed workflows
 and uses **[OpenClaw](https://docs.openclaw.ai/)** as the AI agent gateway.
 
 **OpenClaw** is a self-hosted gateway that wraps LLM providers (Anthropic Claude,
@@ -20,10 +22,13 @@ OpenClaw provides:
   (GitHub's spec-driven development toolkit), delegate implementation to
   CLI tools (Gemini, Copilot), create and modify n8n workflows via API
 
-**MindsDB** serves as the **analytics department** — primarily for external
-business intelligence (combining data from multiple sources: browsing behavior,
-purchases, social interactions, CRM) and secondarily for internal operational
-analytics (conversation trends, usage patterns).
+**[MindsDB](https://github.com/mindsdb/mindsdb)** is a **Federated Query Engine for AI** —
+it connects hundreds of data sources, unifies them via knowledge bases and views
+(no-ETL), and responds from unified data via built-in agents and MCP server.
+In janAGI it serves as the data federation and analytics layer — primarily for
+external business intelligence (combining data from multiple sources: browsing
+behavior, purchases, social interactions, CRM) and secondarily for internal
+operational analytics (conversation trends, usage patterns).
 
 The user interacts with the system via **Telegram**. Everything runs as a
 self-hosted Docker stack on **Coolify** (Hostinger VPS).
@@ -53,11 +58,16 @@ Extensions: `vector`, `pgcrypto`, `pg_trgm`, `unaccent`.
 
 ### n8n (Integrator / Curator)
 
-n8n is the **integrator and curator** — it does NOT think or act on its own.
-It coordinates all processes through fixed workflows and delegates intelligence
-to OpenClaw. Think of n8n as a traffic controller: it routes requests, manages
-state (DB logging), enforces safety gates (Action Draft), and triggers the right
-sub-workflow at the right time.
+[n8n](https://github.com/n8n-io/n8n) is a **fair-code workflow automation platform
+with native AI capabilities**. It supports visual workflow building and custom
+code (JavaScript/Python), has 400+ integrations, and builds AI agent workflows
+via LangChain — all self-hosted under a fair-code license.
+
+In janAGI, n8n acts as the **integrator and curator** — it does NOT think or
+act on its own. It coordinates all processes through fixed workflows and
+delegates intelligence to OpenClaw. Think of n8n as a traffic controller:
+it routes requests, manages state (DB logging), enforces safety gates
+(Action Draft), and triggers the right sub-workflow at the right time.
 
 **Core workflows:**
 
@@ -92,8 +102,8 @@ sub-workflow at the right time.
    - See [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md)
 
 6. **Analytics Reader** (planned)
-   - n8n reads `analytics.*` tables (written by MindsDB) and pushes
-     reports/insights to Telegram or dashboards
+   - n8n reads `analytics.*` tables (written by MindsDB federated queries) and
+     pushes reports/insights to Telegram or dashboards
 
 ### OpenClaw (AI Agent Gateway = Brain + Hands + Eyes)
 
@@ -155,17 +165,23 @@ In n8n, add a gate after VERIFY:
 
 See [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) for HTTP call shapes.
 
-### MindsDB (Analytics Department)
+### MindsDB (Federated Query Engine for AI)
 
-MindsDB is the **analytics department** — a background processor that does
-**not** interfere with live chat. It has two primary missions:
+[MindsDB](https://github.com/mindsdb/mindsdb) is a **Federated Query Engine for AI** —
+it connects hundreds of data sources (databases, APIs, SaaS apps), unifies them
+via knowledge bases and views (no-ETL), and responds from the unified data
+via built-in agents and a built-in MCP server. Its core philosophy:
+**Connect → Unify → Respond.**
 
-**1. External Business Intelligence (primary purpose):**
-- Combine data from multiple sources: web scraping results, purchase/e-commerce
-  data, social media interactions, CRM data, browsing behavior
-- Aggregate and score leads, customers, market signals
+In janAGI, MindsDB operates as a background data federation and analytics layer
+that does **not** interfere with live chat:
+
+**1. External Data Federation & BI (primary purpose):**
+- Connect to multiple data sources: Postgres (`rag.*`), external APIs,
+  web scraping results, CRM, e-commerce databases
+- Unify data via knowledge bases and views — no ETL pipelines needed
 - Build ML models over combined datasets (`CREATE MODEL ... PREDICT ...`)
-- Power dashboards and automated reports
+- Power dashboards and automated reports via built-in agents
 
 **2. Internal Operational Analytics:**
 - Conversation trend detection (daily topic/keyword aggregation)
@@ -173,12 +189,15 @@ MindsDB is the **analytics department** — a background processor that does
 - Memory optimization signals (what to keep, what to archive)
 
 **How it works:**
-- Connects to Postgres as read-only data source (`mindsdb_ro` role)
+- Connects to Postgres as a federated data source (`mindsdb_ro` role)
+- Also connects to external APIs and databases directly (its core strength)
 - OpenClaw feeds external data (scraped content, browsing data) into
   `rag.events` / `rag.artifacts` via n8n workflows
-- MindsDB scheduled jobs process this data into `analytics.*` tables
+- MindsDB unifies this data with external sources and writes results
+  to `analytics.*` tables via scheduled jobs
 - n8n reads `analytics.*` and pushes reports/insights to Telegram
 - UI on port `47334`, MySQL API on `47335`, HTTP API on `47336`
+- Built-in MCP server for AI integrations
 - See [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md)
 
 ### Telegram (Interface Layer)
@@ -248,7 +267,7 @@ sequenceDiagram
     AI-->>N: Structured result
     N->>DB: Store in rag.artifacts + rag.events
     N->>U: Summary reply
-    Note over M,DB: MindsDB batch job later combines<br/>this data with other sources for analytics
+    Note over M,DB: MindsDB later connects this data<br/>with other sources (Unify) for federated analytics
 ```
 
 ### Project Build Flow (Spec Kit)
@@ -332,11 +351,13 @@ or the resource name doesn't match. Fix in Coolify → Settings → Networks.
 ## Agent Architecture Pattern
 
 The system follows a **"n8n integrates, OpenClaw is the agent gateway"** pattern.
-All systems share the same memory (`rag.*` in PostgreSQL).
+[n8n](https://github.com/n8n-io/n8n) is a fair-code workflow automation platform
+with native AI capabilities. All systems share the same memory (`rag.*` in PostgreSQL).
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│   n8n (Integrator / Curator)                            │
+│   n8n (Fair-code Workflow Automation + AI Agents)        │
+│   400+ integrations, LangChain AI agents, JS/Python     │
 │   Telegram ↔ DB logging ↔ Safety gates ↔ Routing         │
 │   AI Agent node calls OpenClaw /v1/responses             │
 │   Decides NOTHING — routes to the right sub-workflow     │
@@ -356,17 +377,21 @@ All systems share the same memory (`rag.*` in PostgreSQL).
 │  Copilot)    │ → rag.artifacts│              │             │
 └──────────────┴───────────────┴──────────────┴─────────────┘
                         │
-              ┌─────────┴──────────┐
-              │ MindsDB              │
-              │ (Analytics Dept.)    │
-              │                      │
-              │ External: combine    │
-              │ browsing + purchases │
-              │ + social → insights  │
-              │                      │
-              │ Internal: trends,    │
-              │ usage, lead scores   │
-              └──────────────────────┘
+              ┌─────────┴────────────────────┐
+              │ MindsDB                    │
+              │ (Federated Query Engine)    │
+              │                              │
+              │ Connect: 100s of data        │
+              │ sources (DBs, APIs, SaaS)    │
+              │ Unify: knowledge bases,      │
+              │ views, jobs (no-ETL)          │
+              │ Respond: built-in agents     │
+              │ + MCP server                  │
+              │                              │
+              │ janAGI: data federation      │
+              │ + analytics (connect PG +     │
+              │ external → unified insights)  │
+              └──────────────────────────────┘
 ```
 
 OpenClaw is the **sole agent gateway** — either:

@@ -62,4 +62,4 @@ These use old function signatures or deprecated APIs. Kept for reference only.
 - [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) — OpenClaw integration
 - [SPECKIT_OPENCLAW_CLI.md](SPECKIT_OPENCLAW_CLI.md) — Spec-Kit spec-driven development flow
 - [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md) — OpenClaw generates n8n workflows via API
-- [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md) — MindsDB batch analytics
+- [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md) — MindsDB federated query engine & analytics

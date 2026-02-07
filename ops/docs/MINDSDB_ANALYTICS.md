@@ -1,10 +1,16 @@
-# MindsDB Analytics Integration
+# MindsDB — Federated Query Engine for AI
 
-MindsDB is the **analytics department** of janAGI. It has two missions:
+[MindsDB](https://github.com/mindsdb/mindsdb) is a **Federated Query Engine for AI** —
+it connects hundreds of data sources (databases, APIs, SaaS apps), unifies them
+via knowledge bases and views (no-ETL), and responds from the unified data
+via built-in agents and a built-in MCP server. Its core philosophy:
+**Connect → Unify → Respond.**
 
-1. **External Business Intelligence (primary)** — combine data from multiple sources
-   (web scraping, social media, purchases, CRM, browsing behavior) into actionable
-   insights, ML-scored leads, and automated reports.
+In janAGI, MindsDB has two missions:
+
+1. **External Data Federation & BI (primary)** — connect and unify data from multiple
+   sources (web scraping, social media, purchases, CRM, browsing behavior) into
+   actionable insights, ML-scored leads, and automated reports.
 2. **Internal Operational Analytics** — conversation trend detection, usage patterns,
    engagement metrics from janAGI’s own `rag.*` data.
 
@@ -17,15 +23,23 @@ MindsDB does **not** interfere with live chat; it operates as a scheduled backgr
 The data pipeline works like this:
 1. **OpenClaw (eyes)** browses websites, scrapes social media, fetches competitor data
 2. **n8n workflows** store this raw data in `rag.events` / `rag.artifacts` (PostgreSQL)
-3. **MindsDB (batch jobs)** reads `rag.*`, combines it with other data sources,
-   runs ML models, and writes results to `analytics.*`
+3. **MindsDB** connects to `rag.*` + external sources, unifies them via knowledge bases
+   and views (no-ETL), runs ML models/jobs, and writes results to `analytics.*`
 4. **n8n workflows** read `analytics.*` and push reports/insights to Telegram
 
 ---
 
 ## What MindsDB Does
 
-### External Business Intelligence (Primary)
+### Core Capabilities (Connect → Unify → Respond)
+
+| Capability | Description |
+|-----------|-------------|
+| **Connect** | Hundreds of data sources: databases (PostgreSQL, MySQL, etc.), APIs, SaaS apps, Google Sheets — all as first-class SQL tables |
+| **Unify** | Knowledge bases for unstructured data, views for cross-source joins (no-ETL), scheduled jobs for automated sync |
+| **Respond** | Built-in agents that answer questions over unified data, built-in MCP server for AI integrations |
+
+### janAGI: External Data Federation & BI (Primary)
 
 | Capability | Description |
 |-----------|-------------|
@@ -35,7 +49,7 @@ The data pipeline works like this:
 | **Customer Behavior Analysis** | Aggregate browsing, purchase, and interaction data across channels |
 | **Custom Models** | `CREATE MODEL ... PREDICT ...` over any Postgres data or external source |
 
-### Internal Analytics (Secondary)
+### janAGI: Internal Analytics (Secondary)
 
 | Capability | Description |
 |-----------|-------------|
@@ -64,7 +78,7 @@ flowchart LR
   end
 
   subgraph MindsDB
-    ML[ML Models / Batch Jobs]
+    ML[Connect / Unify / Respond]
     EXT[External Data Sources]
   end
 
@@ -79,7 +93,8 @@ flowchart LR
 
 ### External Data Sources
 
-MindsDB can connect to external APIs and databases directly:
+MindsDB can connect to external APIs and databases directly — this is its
+core strength as a Federated Query Engine:
 
 | Source Type | Engine | Example Use |
 |-------------|--------|-------------|
@@ -97,7 +112,7 @@ MindsDB runs as a service in the internal Docker network alongside Postgres:
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| MindsDB UI | `47334` | Web editor for models & jobs |
+| MindsDB UI | `47334` | Web editor for models, knowledge bases & jobs |
 | MindsDB MySQL API | `47335` | n8n connects here (MySQL-compatible wire protocol) |
 | MindsDB HTTP API | `47336` | REST API for programmatic access |
 

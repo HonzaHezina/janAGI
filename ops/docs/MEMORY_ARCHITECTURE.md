@@ -5,7 +5,8 @@
 janAGI uses a **unified memory system** built on PostgreSQL + pgvector.
 All data flows through the `rag.*` schema — there is no separate `chat.*` schema.
 **All systems share this memory**: n8n reads/writes via SQL, OpenClaw accesses
-it via n8n webhook APIs, MindsDB reads it for analytics.
+it via n8n webhook APIs, MindsDB connects to it as a federated data source for
+analytics and data unification.
 
 - **Short-term memory**: `rag.events` (append-only message log per conversation)
 - **Long-term memory**: `rag.chunks` (embedded text for semantic search)
