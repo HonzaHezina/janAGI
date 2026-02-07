@@ -319,6 +319,10 @@
         "categories": {
           "categories": [
             {
+              "category": "UNKNOWN",
+              "description": "The intent is unclear or could be multiple categories. Use when not confident enough to classify into MEETING/TASK/EMAIL/CHAT/WEB/DEV."
+            },
+            {
               "category": "MEETING",
               "description": "The user wants to create, move, cancel, or ask about a calendar event/meeting. Mentions date/time (today/tomorrow/next week), availability, scheduling, invitation, 'schůzka', 'meeting', 'kalendář', 'termín', 'pozvánka', 'kdy mám volno', 'naplánuj'."
             },
@@ -341,15 +345,11 @@
             {
               "category": "DEV",
               "description": "The user wants software development work: create/build an app, run spec-kit, generate code, implement features, run tests, or modify a repository. Mentions 'vytvoř appku', 'spec-kit', 'scaffold', 'implementuj', 'commit', 'repo', 'build', 'testy'."
-            },
-            {
-              "category": "UNKNOWN",
-              "description": "The intent is unclear or could be multiple categories. Use when not confident enough to classify into MEETING/TASK/EMAIL/CHAT/WEB/DEV."
             }
           ]
         },
         "options": {
-          "systemPromptTemplate": "You are the Intent Classification Dispatcher for the Jackie AI system.\nYour goal is to route the user's message to the most appropriate specialized workflow.\n\nAnalyze the Input Text and select the best matching category from: {categories}\n\nRouting Guidelines:\n- 'WEB': Select this if the user asks for current news, facts, stock prices, or to search/browse the internet.\n- 'EMAIL': Select this for reading, searching, or sending emails.\n- 'DEV': Select this for programming, code generation, git, or technical tasks.\n- 'MEETING': Select this for calendar events and scheduling.\n- 'TASK': Select this for reminders and todo lists.\n- 'CHAT': Select this for general conversation, analysis, or questions NOT requiring external tools/web/email.\n\nOutput strictly JSON matching the required schema."
+          "systemPromptTemplate": "You are a STRICT intent classifier for the Jackie AI system.\n\nIMPORTANT: You have NO tools. Do NOT call any tools. Do NOT include tool calls, markdown, code fences, or extra text.\n\nTask: Read the Input Text and choose exactly ONE category from: {categories}.\n\nGuidelines (tie-breakers):\n- MEETING: calendar events, scheduling, availability, invitations, dates/times.\n- TASK: todos/reminders, deadlines, 'připomeň', 'úkol'.\n- EMAIL: read/search/reply/send emails, Gmail, mail/pošta.\n- WEB: browse/search current info, verify something on a website, extract from URL.\n- DEV: programming, repo changes, builds/tests, spec-kit.\n- CHAT: general questions, explanation, summary, advice; no external tools required.\n- UNKNOWN: unclear or mixed intent.\n\nOutput format: return ONLY a single valid JSON object with exactly one key: {\"category\": \"<ONE_OF_THE_CATEGORIES>\"}."
         }
       },
       "id": "7998b0b2-9c99-41d2-8047-a999c9d55c16",
@@ -359,7 +359,8 @@
         580,
         300
       ],
-      "typeVersion": 1.1
+      "typeVersion": 1.1,
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1232,6 +1233,13 @@
       "main": [
         [
           {
+            "node": "Log Category Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Log Category Meeting",
             "type": "main",
             "index": 0
@@ -1268,13 +1276,6 @@
         [
           {
             "node": "Log Category Dev",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Log Category Unknown",
             "type": "main",
             "index": 0
           }
@@ -1535,12 +1536,16 @@
       ]
     }
   },
+  "active": false,
   "pinData": {},
   "settings": {
     "executionOrder": "v1"
   },
+  "versionId": "e487ea9a-43fb-4160-b9d2-2a31ad0059be",
   "meta": {
+    "templateCredsSetupCompleted": true,
     "instanceId": "5a7da51956588969891cb8fbd03e12cea4f6c23e6fdb6590eadcd26e5b4a5643"
   },
+  "id": "jFXXs7oB4eBeH2sJ",
   "tags": []
 }
