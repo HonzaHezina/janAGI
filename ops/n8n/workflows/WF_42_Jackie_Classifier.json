@@ -156,12 +156,12 @@
         },
         "options": {}
       },
-      "id": "c42-mergefields",
-      "name": "Set transcribed text",
+      "id": "c42-context",
+      "name": "Prepare Context",
       "type": "n8n-nodes-base.set",
       "position": [
         -280,
-        140
+        300
       ],
       "typeVersion": 3.2
     },
@@ -175,22 +175,22 @@
             },
             {
               "name": "chat_id",
-              "stringValue": "={{ $json.chat_id || $('Voice or Text').item.json.chat_id }}"
+              "stringValue": "={{ $('Voice or Text').item.json.chat_id }}"
             },
             {
               "name": "user_id",
-              "stringValue": "={{ $json.user_id || $('Voice or Text').item.json.user_id }}"
+              "stringValue": "={{ $('Voice or Text').item.json.user_id }}"
             }
           ]
         },
         "options": {}
       },
-      "id": "c42-context",
-      "name": "Prepare Context",
+      "id": "c42-mergefields",
+      "name": "Set transcribed text",
       "type": "n8n-nodes-base.set",
       "position": [
-        -100,
-        300
+        -280,
+        140
       ],
       "typeVersion": 3.2
     },
@@ -204,7 +204,7 @@
       "name": "Start Run",
       "type": "n8n-nodes-base.postgres",
       "position": [
-        100,
+        -60,
         300
       ],
       "typeVersion": 2.6,
@@ -225,7 +225,7 @@
       "name": "Log User Msg",
       "type": "n8n-nodes-base.postgres",
       "position": [
-        300,
+        160,
         300
       ],
       "typeVersion": 2.6,
@@ -248,7 +248,7 @@
       "name": "Telegram Ack",
       "type": "n8n-nodes-base.telegram",
       "position": [
-        500,
+        380,
         300
       ],
       "webhookId": "wf42-ack",
@@ -277,7 +277,7 @@
       "name": "Classifier LLM",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "position": [
-        700,
+        580,
         500
       ],
       "typeVersion": 1.3,
@@ -331,17 +331,108 @@
       "name": "Classify Intent",
       "type": "@n8n/n8n-nodes-langchain.textClassifier",
       "position": [
-        700,
+        580,
         300
       ],
       "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"MEETING\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-meeting",
+      "name": "Log Category Meeting",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 60],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"TASK\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-task",
+      "name": "Log Category Task",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 220],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"EMAIL\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-email",
+      "name": "Log Category Email",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 380],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"CHAT\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-chat",
+      "name": "Log Category Chat",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 540],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"WEB\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-web",
+      "name": "Log Category Web",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 700],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"DEV\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-dev",
+      "name": "Log Category Dev",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 860],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE rag.runs SET metadata = metadata || '{\"category\": \"UNKNOWN\"}'::jsonb WHERE id = '{{ $('Start Run').item.json.run_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "c42-log-unknown",
+      "name": "Log Category Unknown",
+      "type": "n8n-nodes-base.postgres",
+      "position": [900, 1020],
+      "typeVersion": 2.6,
+      "credentials": { "postgres": { "id": "Y1VwNrsd2m68uUCQ", "name": "Postgres account JH" } }
     },
     {
       "id": "c42-exec-meeting",
       "name": "Execute Meeting WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         60
       ],
       "typeVersion": 1.2,
@@ -381,7 +472,7 @@
       "name": "Execute Task WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         220
       ],
       "typeVersion": 1.2,
@@ -421,7 +512,7 @@
       "name": "Execute Email WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         380
       ],
       "typeVersion": 1.2,
@@ -461,7 +552,7 @@
       "name": "Execute Chat WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         540
       ],
       "typeVersion": 1.2,
@@ -501,7 +592,7 @@
       "name": "Execute Web WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         700
       ],
       "typeVersion": 1.2,
@@ -541,7 +632,7 @@
       "name": "Execute SpecKit WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         860
       ],
       "typeVersion": 1.2,
@@ -581,7 +672,7 @@
       "name": "Execute Clarify WF",
       "type": "n8n-nodes-base.executeWorkflow",
       "position": [
-        1100,
+        1150,
         1020
       ],
       "typeVersion": 1.2,
@@ -818,46 +909,123 @@
       "main": [
         [
           {
-            "node": "Execute Meeting WF",
+            "node": "Log Category Meeting",
             "type": "main",
             "index": 0
           }
         ],
+        [
+          {
+            "node": "Log Category Task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Category Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Category Chat",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Category Web",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Category Dev",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Category Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Category Meeting": {
+      "main": [
+        [
+          {
+            "node": "Execute Meeting WF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Category Task": {
+      "main": [
         [
           {
             "node": "Execute Task WF",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Log Category Email": {
+      "main": [
         [
           {
             "node": "Execute Email WF",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Log Category Chat": {
+      "main": [
         [
           {
             "node": "Execute Chat WF",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Log Category Web": {
+      "main": [
         [
           {
             "node": "Execute Web WF",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Log Category Dev": {
+      "main": [
         [
           {
             "node": "Execute SpecKit WF",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Log Category Unknown": {
+      "main": [
         [
           {
             "node": "Execute Clarify WF",
