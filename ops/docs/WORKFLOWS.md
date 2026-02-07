@@ -1,87 +1,88 @@
-# n8n Workflow Templates
+# n8n Workflows: Capabilities & Architecture
 
-All workflow JSON files are in `ops/n8n/`.
+This document maps the n8n workflows to the functional capabilities of the janAGI system.
+We organize workflows by **Role** (Brain, Hands, Eyes, System) rather than just a flat list.
 
-## Live Workflows
+---
 
-These are actively running in production.
+## 🧠 The Brain (Core Assistant)
 
-| File | Trigger | Purpose | DB Functions Used |
-|------|---------|---------|-------------------|
-| `WF_40_Jackie_Telegram_Assistant.json` | Telegram Trigger | Main Jackie AI assistant: voice/text → history → AI agent → ACTION_DRAFT or reply | `start_run_for_thread`, `log_event` (9-arg) |
-| `WF_41_Jackie_Action_Subflow.json` | Telegram callback | Approved action executor: callback → parse → OpenClaw `/v1/responses` → artifact + reply | `start_run_for_thread`, `log_event`, `finish_run`, `INSERT rag.artifacts` |
+The entry point for all user interaction is the **Router Architecture**.
+Instead of one monolithic workflow, we use a classifier to dispatch intents to specialized sub-flows.
 
-### Router + domain branches (new)
+| Workflow File | Role | Description |
+|---|---|---|
+| **`WF_42_Jackie_Classifier.json`** | **Router / Entry Point** | **Start here.** Receives Telegram Text/Voice. Transcribes voice. Classifies intent (MEETING, TASK, EMAIL, CHAT, WEB, DEV). ACKs immediately, then routes to a sub-workflow. |
+| `WF_43_Jackie_Meeting.json` | Handler | Handles calendar events, availability checks. |
+| `WF_44_Jackie_Task.json` | Handler | Manages To-Do lists and reminders. |
+| `WF_45_Jackie_Email.json` | Handler | Search, read, summarize, and draft emails (Gmail). |
+| `WF_46_Jackie_Chat.json` | Handler | General LLM chat with RAG memory (the "default" conversationalist). |
+| `WF_47_Jackie_Clarify.json` | Handler | Asks clarifying questions when intent is UNKNOWN or ambiguous. |
 
-| File | Trigger | Purpose | Status |
-|------|---------|---------|--------|
-| `WF_42_Jackie_Classifier.json` | Telegram Trigger | Async classifier/dispatcher with ACK → MEETING/TASK/EMAIL/CHAT/WEB/DEV/UNKNOWN routing to subflows. Passes `text`, `chat_id`, `conversation_id`, `run_id` to subflows; waits for subflow result; logs/finishes run; replies to Telegram. | **Active (workflowIds must be set manually)** |
-| `WF_43_Jackie_Meeting.json` | Execute Workflow | Handle MEETING intents (Calendar) | Template |
-| `WF_44_Jackie_Task.json` | Execute Workflow | Handle TASK intents (Tasks/Reminders) | Template |
-| `WF_45_Jackie_Email.json` | Execute Workflow | Handle EMAIL intents (Gmail search/read/send) | Template |
-| `WF_46_Jackie_Chat.json` | Execute Workflow | Handle CHAT intents (LLM + RAG) | Template |
-| `WF_47_Jackie_Clarify.json` | Execute Workflow | Clarifying question when intent UNKNOWN | Template |
-| `WF_48_Jackie_Web.json` | Execute Workflow | Web browse/search via OpenClaw `/v1/responses` | Template |
-| `WF_49_Jackie_SpecKit.json` | Execute Workflow | Spec Kit webhook trigger for DEV intents | Template |
+*Note: `WF_40_Jackie_Telegram_Assistant` is the V1 monolithic implementation, now being superseded by WF_42.*
 
-## Active Templates
+---
 
-Ready to import and use.
+## 🤲 The Hands (Software Development)
 
-| File | Trigger | Purpose | DB Functions Used |
-|------|---------|---------|-------------------|
-| `memory_workflows.json` | `/webhook/memory-upsert`, `/webhook/memory-search` | Memory API: embed + store/search in `rag.chunks` | `search_chunks`, `INSERT rag.chunks` |
-| `spec_kit_workflow.json` | `/webhook/janagi/spec/flow` | Spec-Kit: REFINE requirements → EXECUTE build | – (shell commands) |
-| `WF_10_Turbo_OpenClaw_Run.json` | `/webhook/turbo/openclaw/run` | Direct OpenClaw `/v1/responses` call | – |
-| `WF_11_Turbo_OpenClaw_UI_Operator.json` | `/webhook/turbo/openclaw/ui-operator` | OpenClaw PLAN/APPLY/VERIFY pattern | – |
-| `WF_12_Turbo_OpenClaw_Run_RawBody.json` | `/webhook/turbo/openclaw/run-raw` | OpenClaw call with rawBody pattern | – |
-| `WF_20_Builder_Create_Workflow_via_API.json` | `/webhook/builder/workflow/create` | Auto-create n8n workflows via REST API | – |
-| `WF_30_SpecKit_Full_Build_Parallel.json` | `/webhook/janagi/spec-build` | Full Spec Kit build: parallel Gemini + Copilot → winner → PR | – (shell commands) |
+"Spec Kit" is the capability to build software features via spec-driven development.
+It consists of a **Chat Interface** (for talking to the user) and a **Build Engine** (for doing the work).
 
-## Legacy Workflows (Superseded)
+| Workflow File | Role | Description |
+|---|---|---|
+| **`WF_49_Jackie_SpecKit.json`** | **Interface** | Invoked by WF_42 when intent is `DEV`. Translates user request into a Spec Kit payload and calls the webhook. |
+| **`WF_30_SpecKit_Full_Build_Parallel.json`** | **Engine** | The heavy lifter. Triggered by webhook. Runs the full SDLC: `git init`, `specify`, parallel AI coding (Gemini vs Copilot), testing, and PR creation. |
+| `spec_kit_workflow.json` | Legacy | Older "Refine Loop" prototype. Use WF_30 for the modern engine. |
 
-These use old function signatures or deprecated APIs. Kept for reference only.
+---
 
-| File | Status | Issue |
-|------|--------|-------|
-| `main_chat_orchestrator.json` | ⚠️ Legacy | Early prototype, now updated to use correct `rag.*` functions. **Superseded by WF_40.** |
-| `WF_01_Ingest_Message.json` | ⚠️ Legacy | Calls Mistral embeddings API directly. Use `memory_workflows.json` (OpenAI) instead. |
-| `WF_02_Hunter_Run.json` | ⚠️ Legacy | Calls `clawd_worker:8090/tasks/hunt` (service commented out in docker-compose). |
-| `WF_03_Analyst_Draft_and_Telegram_Approval.json` | ⚠️ Legacy | Uses Mistral model + old n8n-langchain PGVector node. |
-| `WF_04_Executor_On_Approve.json` | ⚠️ Legacy | 2-node skeleton. **Superseded by WF_41.** |
+## 👁️ The Eyes (Web Intelligence)
 
-## Reusable Snippets
+Capabilities for browsing, searching, and extracting data from the web.
 
-- `snippets/TELEGRAM_NORMALIZATION.js` — Normalize Telegram message/callback_query/channel_post
-- `snippets/TELEGRAM_PAYLOAD_EXTRACTOR.js` — Extract hidden JSON from `[ACTION_DRAFT]` markers
-- `sql/RAG_POSTGRES_NODES.sql` — Copy-paste SQL for all Postgres nodes (matches live function signatures)
+| Workflow File | Role | Description |
+|---|---|---|
+| **`WF_48_Jackie_Web.json`** | **Interface** | Invoked by WF_42 when intent is `WEB`. Formulates a search/scrape plan and delegates to OpenClaw. |
+| `WF_10_Turbo_OpenClaw_Run.json` | Utility | Low-level generic wrapper for calling OpenClaw `/v1/responses`. Used by other workflows. |
+| `WF_02_Hunter_Run.json` | Legacy | Old cron-job based crawler. Superseded by on-demand agents (WF_48). |
 
-## Import Instructions
+---
 
-1. In n8n: **Workflows → Import from File**
-2. Create required credentials:
-   - **Postgres** — host: `postgres` (docker-compose) or `janagi-db` (Coolify), port: 5432, db: `janagi`, user: `janagi`
-   - **Telegram** — Bot token
-   - **OpenAI** — API key (for embeddings + LLM)
-   - **HTTP Header Auth** — OpenClaw gateway token (for Turbo workflows)
-3. Activate workflows
+## ⚙️ The System (Ops & Automation)
 
-## Related Docs
+Tools that Jackie uses to modify the system itself (n8n, databases, etc.).
 
-- [DB_SCHEMA.md](DB_SCHEMA.md) — Database tables, functions, indexes
-- [ARCHITECTURE.md](ARCHITECTURE.md) — System design
-- [MEMORY_ARCHITECTURE.md](MEMORY_ARCHITECTURE.md) — Memory/RAG details
-- [ACTION_DRAFT_PROTOCOL.md](ACTION_DRAFT_PROTOCOL.md) — Approval gate pattern
-- [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) — OpenClaw integration
-- [SPECKIT_OPENCLAW_CLI.md](SPECKIT_OPENCLAW_CLI.md) — Spec-Kit spec-driven development flow
-- [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md) — OpenClaw generates n8n workflows via API
-- [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md) — MindsDB federated query engine & analytics
+| Workflow File | Role | Description |
+|---|---|---|
+| **`WF_20_Builder_Create_Workflow_via_API.json`** | **Automation** | "Text to Workflow". Allows Jackie to creating new n8n workflows by generating JSON and pushing it via the n8n API. |
+| `WF_11_Turbo_OpenClaw_UI_Operator.json` | UI Automation | A robust "Plan → Apply → Verify" pattern for OpenClaw to click buttons in the n8n UI (fallback when API is insufficient). |
+| `memory_workflows.json` | Infrastructure | API for embedding and retrieving memories from Postgres/pgvector. |
 
-## WF_42 routing and wiring guide (summary)
+---
 
-- Categories: MEETING → WF_43, TASK → WF_44, EMAIL → WF_45, CHAT → WF_46, WEB → WF_48, DEV → WF_49, UNKNOWN → WF_47.
-- Subflow inputs (Execute Workflow): `text`, `chat_id`, `conversation_id`, `run_id`.
-- Subflow outputs: return `{ output: "..." }` (used by Log Bot Msg → Telegram Reply).
-- WorkflowIds: set each Execute Workflow node in WF_42 to the correct target after import.
-- Safety: use Action Draft (WF_40/41) for risky actions if you want approvals before WF_42 dispatch.
-- Test matrix (manual): send sample for each category → expect ACK → correct branch → DB logs → Telegram reply.
+## 🗑️ Deprecated / Legacy
+
+Kept for reference or backward compatibility during migration.
+
+- `WF_40_Jackie_Telegram_Assistant.json`: V1 Monolith.
+- `main_chat_orchestrator.json`: Prototype.
+- `WF_01_Ingest_Message.json`: Prototype ingestion.
+- `WF_03_Analyst_Draft...`: Prototype approval flow.
+- `WF_04_Executor...`: Replaced by `WF_41`.
+
+---
+
+## Wiring Guide (Post-Import)
+
+After importing `WF_42`, you must manually wire the "Execute Workflow" nodes to the correct sub-flow IDs:
+
+1. Import `WF_42` and all sub-flows (`WF_43`–`WF_49`).
+2. Open `WF_42_Jackie_Classifier`.
+3. Locate the **Execute Meeting WF** node → Set `Workflow ID` to your imported `WF_43`.
+4. Repeat for Task (`WF_44`), Email (`WF_45`), Chat (`WF_46`), Web (`WF_48`), Spec (`WF_49`), Unknown (`WF_47`).
+5. Save.
+
+**Test Matrix:**
+- Send "Ahoj" → Expect `WF_46` (Chat).
+- Send "Naplánuj meeting zítra" → Expect `WF_43` (Meeting).
+- Send "Najdi na webu kurz bitcoinu" → Expect `WF_48` (Web).
