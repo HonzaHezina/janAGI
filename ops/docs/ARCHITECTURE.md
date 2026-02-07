@@ -44,6 +44,15 @@ AI reasoning engine with optional browser/CLI tools:
 - **Workflow Builder**: generates n8n workflow JSON and creates workflows via n8n API
 - Connects to n8n via `http://n8n:5678` (internal Docker DNS)
 
+### MindsDB (Analytics Layer)
+Batch analytics engine — does **not** interfere with live chat:
+- Connects to Postgres as read-only data source (`mindsdb_ro` role)
+- Runs scheduled jobs: lead scoring, daily trend detection
+- Writes results to `analytics.*` schema
+- n8n reads scores/trends and pushes reports to Telegram
+- UI on port `47334`, MySQL API on `47335`, HTTP API on `47336`
+- See [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md)
+
 ### Telegram (Interface Layer)
 Primary user interface:
 - Receives messages, forwards to Chat Orchestrator
@@ -87,8 +96,10 @@ All services communicate via internal Docker DNS:
 |------|----|-----|
 | n8n | Postgres | `postgresql:5432` |
 | n8n | OpenClaw | `http://openclaw:18789` |
+| n8n | MindsDB | `mindsdb:47335` (MySQL API) |
 | OpenClaw | n8n | `http://n8n:5678` |
 | OpenClaw | n8n API | `http://n8n:5678/api/v1/` |
+| MindsDB | Postgres | `postgres:5432` (read-only) |
 
 **Important**: Never use `localhost` between containers. Coolify manages the network.
 

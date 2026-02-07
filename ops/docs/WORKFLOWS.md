@@ -49,3 +49,4 @@ All workflow JSON files are in `ops/n8n/`.
 - [OPENCLAW_TURBO.md](OPENCLAW_TURBO.md) — OpenClaw integration
 - [SPECKIT_OPENCLAW_CLI.md](SPECKIT_OPENCLAW_CLI.md) — Spec-Kit autopilot
 - [N8N_WORKFLOW_BUILDER.md](N8N_WORKFLOW_BUILDER.md) — OpenClaw generates n8n workflows via API
+- [MINDSDB_ANALYTICS.md](MINDSDB_ANALYTICS.md) — MindsDB batch analytics, lead scoring, trends

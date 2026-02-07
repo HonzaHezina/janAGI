@@ -67,6 +67,24 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
 
+  # MindsDB — batch analytics, lead scoring, trend detection
+  # Connects to Postgres as read-only data source, writes to analytics.* schema
+  mindsdb:
+    image: mindsdb/mindsdb:latest
+    restart: unless-stopped
+    environment:
+      MINDSDB_STORAGE_DIR: /root/mdb_storage
+      TZ: ${TZ:-Europe/Prague}
+    volumes:
+      - mindsdb_data:/root/mdb_storage
+    ports:
+      - "47334:47334"   # UI
+      - "47335:47335"   # MySQL API (n8n connects here)
+      - "47336:47336"   # HTTP API
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Optional: Web scraping worker
   # Uncomment when needed
   # clawd_worker:
@@ -82,3 +100,4 @@ services:
 volumes:
   postgres_data:
   n8n_data:
+  mindsdb_data:

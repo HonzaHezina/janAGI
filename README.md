@@ -63,8 +63,7 @@ flowchart LR
 |-----------|-----------|---------|
 | Orchestrator | n8n (latest) | Workflow automation, webhook API |
 | Database | PostgreSQL 16 + pgvector 0.8.x | Vector store, audit log, knowledge base |
-| AI Agent | OpenClaw / Jackie | LLM reasoning, browser automation |
-| Chat Interface | Telegram Bot | User interaction |
+| AI Agent | OpenClaw / Jackie | LLM reasoning, browser automation || Analytics | MindsDB | Batch lead scoring, trend detection, reporting || Chat Interface | Telegram Bot | User interaction |
 | Hosting | Coolify on Hostinger VPS | Docker stack management |
 | Embeddings | OpenAI text-embedding-3-small (1536d) | Semantic search |
 
@@ -80,6 +79,8 @@ All data lives in a single Postgres database with the `rag` schema:
 - **`rag.events`** — Append-only audit log (messages, tool calls, errors)
 - **`rag.artifacts`** — Generated files, specs, diffs
 - **`rag.sources`** → **`rag.documents`** → **`rag.chunks`** — RAG pipeline (source → document → embedded chunks)
+- **`analytics.trends_daily`** — Daily topic/keyword aggregation (MindsDB)
+- **`analytics.lead_scores`** — ML-scored leads (MindsDB)
 
 Helper functions: `rag.start_run()`, `rag.log_event()`, `rag.finish_run()`, `rag.search_chunks()`.
 
@@ -137,7 +138,9 @@ In n8n UI: **Workflows → Import from File** — import the JSON files from `op
 Inside the Docker stack, services reach each other by service name:
 - n8n → Postgres: `postgresql:5432` (Coolify managed)
 - n8n → OpenClaw: `http://openclaw:18789`
+- n8n → MindsDB: `mindsdb:47335` (MySQL API)
 - OpenClaw → n8n: `http://n8n:5678`
+- MindsDB → Postgres: `postgres:5432` (read-only)
 
 **Never use `localhost` or `127.0.0.1`** between containers.
 
@@ -158,6 +161,7 @@ janAGI/
 │   │   ├── DB_SCHEMA.md
 │   │   ├── OPENCLAW_DISPATCHER_CONTRACT.md
 │   │   ├── CLI_IMPLEMENTER_CONTRACT.md
+│   │   ├── MINDSDB_ANALYTICS.md
 │   │   ├── OPENCLAW_TURBO.md
 │   │   ├── ACTION_DRAFT_PROTOCOL.md
 │   │   ├── SPECKIT_OPENCLAW_CLI.md
